@@ -1,0 +1,72 @@
+{% extends 'trackdrawing/PageTemplate.html' %}
+{% load render_table from django_tables2 %}
+{% block mainframe %}
+<div>
+	<form action="{% url 'work' %}" method="post">{% csrf_token %}
+	    <label for="plans">Nombre de plan: </label>
+	    <input id="plans" class="col-md-1" type="text" name="plans_nb" value="{{nb_plan_max}}">
+	    <input type="submit" class="btn btn-primary" value="OK">
+	</form>
+</div>
+
+<div>
+	<form action="{% url 'checker' %}" method="post">{% csrf_token %}
+	    <label for="plans">Nombre de plans à checker: </label>
+	    <input id="plans" class="col-md-1" type="text" name="plans_nb" value="{{nb_plan_c_max}}">
+	    <input type="submit" class="btn btn-primary" value="OK">
+	</form>
+</div>
+
+<div>
+	<form action="{% url 'test' %}" method="post">{% csrf_token %}
+	    <input type="submit" class="btn btn-primary" value="OK">
+	</form>
+</div>
+
+	<div id="line_chart" style="width: 75%">
+	    <embed type="image/svg+xml" src= {{ chart_line|safe }} />
+	</div>
+	<div >
+		{{ AverageTimeTable|safe }}
+	</div>
+
+
+	<div id="line_chart" style="width: 75%">
+	    <embed type="image/svg+xml" src= {{ chart_xy|safe }} />
+	</div>
+
+	<div >
+		<table class="table">
+			<thead>
+				<tr>
+					<th scope="col"></th>
+					<th scope="col">Temps moyen par plan closed</th>
+					<th scope="col">Temps moyen par plan backlog</th>
+					<th scope="col">Temps moyen total par plan</th>
+
+				</tr>
+			</thead>
+			<tbody>
+				
+				{% for values in temp_total %}
+					<tr>
+						{% for val in values %}
+							<td>{{val}}</td>
+						{% endfor%}
+					</tr>
+				{% endfor%}
+			</tbody>
+		</table>
+		
+	</div>
+
+	
+
+	
+
+</div>
+
+
+{% endblock %}
+
+

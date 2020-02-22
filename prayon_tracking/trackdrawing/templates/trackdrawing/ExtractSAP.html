@@ -1,0 +1,19 @@
+{% for extractsap in derniers_articles %}
+    <div class="article">
+       <h3>{{ extractsap.title }}</h3>
+       <a href="{% url 'show_image' %}" target="_blank">{{ extractsap.num_cadastre|truncatewords_html:80 }}</a>
+    </div>
+{% endfor %}
+
+{# Mise en forme de la pagination ici #}
+{% if is_paginated %}
+    <div class="pagination">
+           {% if page_obj.has_previous %}
+               <a href="?page={{ page_obj.previous_page_number }}">Précédente</a> —
+           {% endif %}
+           Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+           {% if page_obj.has_next %}
+              — <a href="?page={{ page_obj.next_page_number }}">Suivante</a>
+           {% endif %}
+    </div>
+{% endif %}

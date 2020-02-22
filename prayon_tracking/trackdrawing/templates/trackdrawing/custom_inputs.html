@@ -1,0 +1,7 @@
+{% load crispy_forms_field %}
+
+  <div class="form-label-group">
+    {% crispy_field field 'class' 'textinput textInput form-control' %}
+    <label for="{{ field.id_for_label }}">{{ field.label|safe }}</label>
+    {% include 'bootstrap4/layout/help_text_and_errors.html' %}
+</div>
