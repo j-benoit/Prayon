@@ -28,6 +28,7 @@ urlpatterns = [
     url(r'show/(?P<num_cadastre>\d+)$', views.DisplayDrawing, name='show_image'),
     # url(r'^backlog/(?P<pk>\d+)$', views.Send_To_Backlog, name='backlog'),
     url(r'^dashboard', views.Dashboard, name='dash'),
+    url(r'^Backlog', views.ListBacklog.as_view(), name='Backlog'),
     url(r'^work', views.Dispatch_Work, name='work'),
     url(r'^test', views.Test, name='test'),
     url(r'^checker', views.nbChecker, name='checker'),

@@ -1,11 +1,18 @@
 {% extends 'trackdrawing/PageTemplate.html' %}
-
+{% load Auth_extra %}
 {% load crispy_forms_tags %}
 
 {% block mainframe %}
 
     {% crispy form %}
 
+<script>
+$( document ).ready(function() {
+    {% if  user|has_group:'Check' %}
+        $("button[name='backlog']").hide();
+    {% endif %}
+});
+</script>
 {% endblock %}
 
 

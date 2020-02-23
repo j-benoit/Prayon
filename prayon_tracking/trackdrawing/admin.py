@@ -50,7 +50,7 @@ class Updated_InfoAdmin(ImportExportModelAdmin):
 
 class WorkDataAdmin(ImportExportModelAdmin):
     resource_class = WorkDataResource
-    list_display = ('id', 'id_SAP', 'id_user', 'status','created_date', 'modified_date')
+    list_display = ('id', 'id_SAP', 'id_user', 'id_checker', 'status','created_date', 'modified_date')
     ordering = ('id',)
 
 

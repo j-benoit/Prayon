@@ -1,35 +1,24 @@
 {% extends 'trackdrawing/PageTemplate.html' %}
 {% load render_table from django_tables2 %}
 {% block mainframe %}
-<div>
-	<form action="{% url 'work' %}" method="post">{% csrf_token %}
-	    <label for="plans">Nombre de plan: </label>
-	    <input id="plans" class="col-md-1" type="text" name="plans_nb" value="{{nb_plan_max}}">
-	    <input type="submit" class="btn btn-primary" value="OK">
-	</form>
-</div>
-
-<div>
-	<form action="{% url 'checker' %}" method="post">{% csrf_token %}
-	    <label for="plans">Nombre de plans à checker: </label>
-	    <input id="plans" class="col-md-1" type="text" name="plans_nb" value="{{nb_plan_c_max}}">
-	    <input type="submit" class="btn btn-primary" value="OK">
-	</form>
-</div>
-
-<div>
-	<form action="{% url 'test' %}" method="post">{% csrf_token %}
-	    <input type="submit" class="btn btn-primary" value="OK">
-	</form>
-</div>
-
-	<div id="line_chart" style="width: 75%">
-	    <embed type="image/svg+xml" src= {{ chart_line|safe }} />
+<div class="row ">
+	<div class="col col-md-10">
+		<div class="row text-center">
+			<div id="line_chart" style="width: 75%">
+				<embed type="image/svg+xml" src= {{ chart_line|safe }} />
+			</div>
+		</div>
+		<div class="row text-center">
+				{{ AverageTimeTable|safe }}
+		</div>
 	</div>
-	<div >
-		{{ AverageTimeTable|safe }}
+	<div class="col col-md-2">
+		<form action="" method="get">
+			{{ history_filter.form.as_p }}
+			<input type="submit" />
+		</form>
 	</div>
-
+</div>
 
 	<div id="line_chart" style="width: 75%">
 	    <embed type="image/svg+xml" src= {{ chart_xy|safe }} />

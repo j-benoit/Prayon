@@ -1,7 +1,14 @@
 {% extends 'trackdrawing/PageTemplate.html' %}
+{% load Auth_extra %}
 {% load render_table from django_tables2 %}
 {% block mainframe %}
 
+{% if user|has_group:'Check' %}
+    <h1>Liste des plans à checker</h1>
+{% else %}
+    <h1>Liste des plans à traiter</h1>
+{% endif %}
 {% render_table table %}
 
+<br>
 {% endblock %}

@@ -8,15 +8,17 @@ from django.core.files.storage import FileSystemStorage
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.http import HttpResponse, HttpResponseNotFound, FileResponse
-from .models import ExtractSAP, Updated_info, Work_data,Project_history,communData
+from .models import ExtractSAP, Updated_info, Work_data, Project_history, communData
 from .forms import UpdatedInfoForm
 from django.contrib.auth.decorators import login_required
 from itertools import cycle
 from django.contrib.auth.mixins import LoginRequiredMixin
+from .filters import Project_historyFilter
+from django.utils.dateparse import parse_duration
 
 
 from django_tables2 import SingleTableView
-from .tables import ExtractTable
+from .tables import ExtractTable, WorkTable
 
 from PIL import Image
 import img2pdf
@@ -77,13 +79,38 @@ def GroupUser (request):
     return redirect('Admin')
 
 
-def Admin (request):
+def Admin(request):
+    # get number of drawing that remain not affected
+    nb_plan_max = ExtractSAP.objects.all().count() - Work_data.objects.all().count()
+    # set drawings quantity to be checked
+    nb_plan_c_max = communData.objects.get(pk=1).nb_plan_check
+
+    groupes = Group.objects.all().exclude(name='CP')
     usr = User.objects.all()
-    groups = [x.name for x in Group.objects.all()] 
-    users = []
-    for u in usr :
-        users.append([u.username,[x.name for x in u.groups.all()]])
- 
+
+    old_user_list = Work_data.objects.filter(status__in=['OPEN', 'BACKLOG']).values('id_user', 'id_user__username').distinct()
+    new_user_list = User.objects.all()
+    if request.method == 'POST':
+        if 'transfer_task' in request.POST:
+            old_user_id = request.POST.get('old_id')
+            new_user_id = request.POST.get('new_id')
+            print(old_user_id, new_user_id)
+            if old_user_id != new_user_id:
+                old_user = User.objects.get(pk=old_user_id)
+                new_user = User.objects.get(pk=new_user_id)
+                for record in Work_data.objects.filter(id_user=old_user, status__in=['OPEN', 'BACKLOG']):
+                    record.id_user = new_user
+                    record.save()
+            print('toto')
+        elif 'Chg_Group' in request.POST:
+            for key, value in request.POST.items():
+                if key[:6] == 'group_':
+                    user_to_modify = User.objects.get(pk=key[6:])
+                    user_to_modify.groups.remove(Group.objects.get(name='Prod'))
+                    user_to_modify.groups.remove(Group.objects.get(name='Check'))
+                    user_to_modify.groups.add(Group.objects.get(name=value))
+                    user_to_modify.save()
+
     return render(request, "trackdrawing/Admin.html", locals())
 
 
@@ -98,25 +125,26 @@ def nbChecker (request):
 
 def Dashboard(request):
     
-    if has_group(request.user,'CP') :
-        # get number of drawing that remain not affected
-        nb_plan_max=ExtractSAP.objects.all().count()-Work_data.objects.all().count()
-        # set drawings quantity to be checked
-        nb_plan_c_max = communData.objects.get(pk=1).nb_plan_check
-
+    if has_group(request.user, 'CP'):
         # Extract history data from DB to Dataframe
-        data = Project_history.objects.filter()
+        history_filter = Project_historyFilter(request.GET, queryset=Project_history.objects.all())
+        data = history_filter.qs
         df = pd.DataFrame.from_records(data.values())
-        df_t=df.sort_values('date')
 
         # Modify dataframe indexes
         df = df.set_index(['date', 'id_user_id'])
         # Catch most recent date
         max_date = max(df.index.get_level_values(0)).strftime("%Y-%m-%d")
         # Reduce dataframe to the most recent date
-        dfextract = df.iloc[df.index.get_level_values('date') == max_date, df.columns.isin({'open_drawings', 'backlog_drawings', 'closed_drawings', 'checked_drawings'})]
+        dfextract = df.iloc[df.index.get_level_values('date') == max_date, df.columns.isin({'open_drawings',
+                                                                                            'backlog_drawings',
+                                                                                            'closed_drawings',
+                                                                                            'checked_drawings',
+                                                                                            'invalid_drawings'})]
         # Create list for comprehensive username (instead of user id
-        list_user = [record.username for record in User.objects.filter(pk__in=dfextract.index.get_level_values('id_user_id').to_list())]
+        list_user = [record.username for record in User.objects.filter(pk__in=
+                                                                       dfextract.index
+                                                                       .get_level_values('id_user_id').to_list())]
 
         # Transfer dataframe data to pygal Chart
         line_chart = pygal.StackedBar()
@@ -129,7 +157,7 @@ def Dashboard(request):
 
         dfextract = df.iloc[df.index.get_level_values('date') == max_date, df.columns.isin({'avg_closed_time', 'avg_backlog_time'})]
         dfextract['Avg'] = dfextract.apply(lambda row : (row.avg_closed_time + row.avg_backlog_time)/2, axis=1)
-        print(dfextract)
+        # print(dfextract)
         styles = [
             {'selector': "th.blank", 'props': [('display', 'none')]},  # hide dataframe header (ie: the skill id)
             {'selector': "th.row_heading", 'props': [('display', 'none')]},  # hide dataframe header (ie: the skill id)
@@ -144,21 +172,46 @@ def Dashboard(request):
             .render()
 
         # print(df.groupby(level=[0]).sum())
+        data = Project_history.objects.all()
+        if len(history_filter.data) != 0:
+            if history_filter.data['id_user']:
+                data = data.filter(id_user=history_filter.data['id_user'])
+            if history_filter.data['date']:
+                data = data.filter(date__lte=history_filter.data['date'])
+        df = pd.DataFrame.from_records(data.values())
+        df = df.set_index(['date', 'id_user_id'])
         dfextract = df.groupby(level=[0]).sum()
         # print(dfextract)
-        dfextract = dfextract.iloc[ : , dfextract.columns.isin({'open_drawings', 'backlog_drawings', 'closed_drawings', 'checked_drawings'})]
+        dfextract = dfextract.iloc[ : , dfextract.columns.isin({'open_drawings',
+                                                                'backlog_drawings',
+                                                                'closed_drawings',
+                                                                'checked_drawings',
+                                                                'invalid_drawings'})]
         # print(dfextract.index)
         xy_chart = pygal.DateTimeLine(x_label_rotation=35)
         xy_chart.title = 'Cumulé équipe'
         for col in dfextract.columns.to_list():
             xy_chart.add(col, [(index, row[col]) for index, row in dfextract.iterrows()])
-        chart_xy= xy_chart.render_data_uri()
+        chart_xy = xy_chart.render_data_uri()
         return render(request, "trackdrawing/dashboradAdmin.html", locals())
-    else :
+    else:
         data = Project_history.objects.filter(id_user__pk=request.user.id)
         df = pd.DataFrame.from_records(data.values())
         df = df.sort_values('date', ascending=False)
         return render(request, "trackdrawing/dashboradUser.html", locals())
+
+
+class ListBacklog(SingleTableView):
+    pass
+    model = Work_data
+    context_object_name = "backlog"
+    table_class = WorkTable
+    template_name = "trackdrawing/Backlog_list.html"
+    paginate_by = 10
+
+    def get_table_data(self):
+        table_data = Work_data.objects.filter(id_user__pk=self.request.user.id).exclude(status='OPEN')
+        return table_data
 
 
 class ListeSAP(LoginRequiredMixin, SingleTableView):
@@ -174,7 +227,7 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
             table_data = []
             temp_user = [[record.id_SAP.pk,record.id_user.pk] for record in Work_data.objects.filter(status="CLOSED").exclude(id_user__pk=self.request.user.id)]
             table_data = ExtractSAP.objects.filter(id__in=[x[0] for x in temp_user])
-            id_users=list(dict.fromkeys([x[1] for x in temp_user]))
+            id_users = list(dict.fromkeys([x[1] for x in temp_user]))
             
             tmp_table_data=[]
             nb_plan_per_user=0
@@ -188,9 +241,17 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
                         if nb_plan_per_user == 0:
                             break
             return tmp_table_data
-        else :
-            user_drawing_list = [record.id_SAP.pk for record in Work_data.objects.filter(id_user__pk=self.request.user.id)]
+        else:
+            user_drawing_list = [record.id_SAP.pk for record in Work_data.objects.filter(id_user__pk=self.request.user.id, status='OPEN')]
             table_data = ExtractSAP.objects.filter(id__in=user_drawing_list)
+            if table_data.count() == 0:
+                # Affect new drawing automaticaly
+                already_dispatched_records = [record.id_SAP.pk for record in Work_data.objects.all()]
+                record_to_dispatched = ExtractSAP.objects.all().exclude(id__in=already_dispatched_records).order_by(
+                    'id')[:1]
+                new_drawing = Work_data.objects.create(id_SAP=record_to_dispatched[0], id_user=self.request.user, status='OPEN')
+                return ExtractSAP.objects.filter(id=new_drawing.id_SAP.pk)
+
             return table_data
 
 
@@ -200,41 +261,72 @@ class UpdatedInfoCreate(UpdateView):
     form_class = UpdatedInfoForm
     success_url =reverse_lazy('accueil')
 
+    def form_valid(self, form):
+        form.instance.user = self.request.user
+        record = Work_data.objects.get(id_SAP__pk=form.instance.pk)
+        data = form.cleaned_data
+        if has_group(form.instance.user, 'Check'):
+            # drawing is checked
+            status = 'CHECKED'
+            drawing = ExtractSAP.objects.get(pk=form.instance.pk)
+            for key in UpdatedInfoForm._meta.fields:
+                if data[key] != getattr(drawing,key):
+                    # One field has been modified by checker
+                    status = 'INVALID'
+                    break
+            record.status = status
+            record.id_checker = form.instance.user
+            record.check_time_tracking = parse_duration(data["chronotime"]) - record.time_tracking
+            print(parse_duration(data["chronotime"]))
+            print(record.time_tracking)
+            print(parse_duration(data["chronotime"]) - record.time_tracking)
+        else:
+            record.time_tracking = parse_duration(data["chronotime"])
+        record.save()
+        return super(UpdatedInfoCreate, self).form_valid(form)
 
 def DisplayDrawing(request, num_cadastre):
     fs = FileSystemStorage()
-    listOfFiles = [f[:15] for f in os.listdir('D:\\Prayon') if os.path.isfile('D:\\Prayon\\' + f)]
-    # print(listOfFiles)
-    print('Nb fichiers images',  len(listOfFiles))
-    nb_extract_with_draw = [record.pk for record in ExtractSAP.objects.all() if record.num_cadastre in listOfFiles]
-    print('Nb Extract with images', len(nb_extract_with_draw))
-    nb_extract_without_draw = [record.pk for record in ExtractSAP.objects.all() if record.num_cadastre not in listOfFiles]
-    print('Nb Extract without images', len(nb_extract_without_draw))
-    nb_image_without_record = [image for image in listOfFiles if not ExtractSAP.objects.filter(num_cadastre=image).exists()]
-    print('Nb image without record', len(nb_image_without_record))
-    print('Nb Extract without images', nb_extract_without_draw)
-    print('Nb image without record', nb_image_without_record)
+    # listOfFiles = [f[:15] for f in os.listdir('D:\\Prayon') if os.path.isfile('D:\\Prayon\\' + f)]
+    # # print(listOfFiles)
+    # print('Nb fichiers images',  len(listOfFiles))
+    # nb_extract_with_draw = [record.pk for record in ExtractSAP.objects.all() if record.num_cadastre in listOfFiles]
+    # print('Nb Extract with images', len(nb_extract_with_draw))
+    # nb_extract_without_draw = [record.pk for record in ExtractSAP.objects.all() if record.num_cadastre not in listOfFiles]
+    # print('Nb Extract without images', len(nb_extract_without_draw))
+    # nb_image_without_record = [image for image in listOfFiles if not ExtractSAP.objects.filter(num_cadastre=image).exists()]
+    # print('Nb image without record', len(nb_image_without_record))
+    # print('Nb Extract without images', nb_extract_without_draw)
+    # print('Nb image without record', nb_image_without_record)
     # filename = 'E53233081_A00_001.PDF'
     filename = ExtractSAP.objects.get(pk=num_cadastre).num_cadastre
-    file_in = filename +'.tif'
-    file_out = filename + '.pdf'
+    if fs.exists(os.path.join(fs.location, filename+'.tif')):
+        file_in = filename +'.tif'
+        file_in_extend = '.tif'
+    elif fs.exists(os.path.join(fs.location, filename + '.tiff')):
+        file_in = filename + '.tiff'
+        file_in_extend = '.tiff'
+    elif fs.exists(os.path.join(fs.location, filename+'.pdf')):
+        file_to_open = os.path.join(fs.location, filename+'.pdf')
     filenamein = os.path.join(fs.location, file_in)
-    filenameout = os.path.join(fs.location, file_out)
-    filenameout_tmp = os.path.join(fs.location, filename +'.tiff')
     if fs.exists(filenamein):
-         # with open(filenameout, "wb") as f:
-         #     f.write(img2pdf.convert(fs.path(filenamein)))
-        # Image convert with PILLOW direct ==> produce large PDF
-        image = Image.open(fs.path(filenamein))
-        width, height = image.size
-        col = image.getcolors()
-        image.save(filenameout_tmp, format='TIFF', save_all=True)
-        with open(filenameout, "wb") as f:
-            f.write(img2pdf.convert(fs.path(filenameout_tmp)))
-        os.remove(filenameout_tmp)
-        with fs.open(filenameout) as pdf:
+        if file_in_extend:
+            file_out = filename + '.pdf'
+            file_to_open = os.path.join(fs.location, file_out)
+            filenameout_tmp = os.path.join(fs.location, filename + '.tiff')
+            # with open(filenameout, "wb") as f:
+            #     f.write(img2pdf.convert(fs.path(filenamein)))
+            # Image convert with PILLOW direct ==> produce large PDF
+            image = Image.open(fs.path(filenamein))
+            width, height = image.size
+            col = image.getcolors()
+            image.save(filenameout_tmp, format='TIFF', save_all=True)
+            with open(file_to_open, "wb") as f:
+                f.write(img2pdf.convert(fs.path(filenameout_tmp)))
+            os.remove(filenameout_tmp)
+        with fs.open(file_to_open) as pdf:
            response = HttpResponse(pdf, content_type='application/pdf')
-           response['Content-Disposition'] = 'inline; ' + file_out
+           response['Content-Disposition'] = 'inline; ' + file_to_open.basename
            return response
     else:
         return HttpResponseNotFound('The requested pdf was not found in our server.')

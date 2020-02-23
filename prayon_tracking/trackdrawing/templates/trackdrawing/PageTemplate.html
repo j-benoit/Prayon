@@ -34,6 +34,9 @@
                         <li class="nav-item">
                             <a class="nav-link" data-toggle="menu" href="{% url "dash" %}">Dash</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-toggle="menu" href="{% url "Backlog" %}">Backlog</a>
+                        </li>
                     {% endif %}
                     {% if user|has_group:'CP' %}
                         <li class="nav-item">

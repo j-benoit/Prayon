@@ -1,80 +1,27 @@
-let checkboxes = [];
-let doubtFields = [];
-
 const disbaleInput = element => {
     const id = $(element).attr("id");
     const fieldName = id.substr(9);
     const input_id = `id_${fieldName}`;
     const checkboxText = `[${fieldName.toUpperCase()}] = Aucune valeur trouvée\n`;
-
-    setCheckboxes({
-        id: fieldName,
-        text: checkboxText,
-        checked: $(element)[0].checked
-    });
+    const id_comment = "id_backlog_comment";
 
     if ($("#" + id).is(":checked") == true) {
         $("#" + input_id).prop("disabled", false);
         // console.log('checked');
+        var comment = $(`#${id_comment}`).val();
+        comment = comment.replace(checkboxText, "");
+        $(`#${id_comment}`).val(comment)
     } else {
         // Set readonly
         $("#" + input_id).prop("disabled", true);
 
         // Clean value of corresponding input
         $("#" + input_id)[0].value = "";
+
+        // Add comment in text area
+        var comment = checkboxText + $(`#${id_comment}`).val();
+        $(`#${id_comment}`).val(comment);
     }
-};
-
-const setCheckboxes = newCheckbox => {
-    checkboxes.forEach((box, index) => {
-        if (box.id === newCheckbox.id) {
-            console.log("MATCHED");
-            delete checkboxes[index];
-        }
-    });
-
-    checkboxes.push(newCheckbox);
-};
-
-const setDoubtFields = newDoubt => {
-    doubtFields.forEach((field, index) => {
-        if (field.id === newDoubt.id) {
-            delete doubtFields[index];
-        }
-    });
-
-    doubtFields.push(newDoubt);
-};
-
-const setColorBtnAndCheckAttr = btn => {
-    if (btn.className.includes("btn-success")) {
-        btn.setAttribute("class", "btn btn-warning");
-        btn.setAttribute("checked", "false");
-    } else {
-        btn.setAttribute("class", "btn btn-success");
-        btn.setAttribute("checked", "true");
-    }
-    return btn.getAttribute("checked");
-};
-
-const generateText = array => {
-    return array
-        .filter(item => {
-            if (item !== undefined) {
-                if (!item.checked) return true;
-            }
-        })
-        .map(box => box.text)
-        .join("");
-};
-
-const renderCommentText = () => {
-    const id = "id_backlog_comment";
-
-    const checkboxText = generateText(checkboxes);
-    const doubtText = generateText(doubtFields);
-
-    $(`#${id}`)[0].innerHTML = `${checkboxText} \n ${doubtText}`;
 };
 
 const deactivateSubmitBtn = () => {
@@ -90,18 +37,24 @@ const deactivateSubmitBtn = () => {
 
 $(":checkbox").change(function() {
     disbaleInput(this);
-    renderCommentText();
 });
 
 const handleDoubtField = (event, field) => {
     const doubtText = `[${field.toUpperCase()}] = A confirmer\n`;
-    const checkedDoubtBtn = JSON.parse(setColorBtnAndCheckAttr(event));
-
-    setDoubtFields({
-        id: field,
-        text: doubtText,
-        checked: checkedDoubtBtn
-    });
+    const id_comment = "id_backlog_comment";
+    console.log($(event))
+    if ($(event).hasClass("btn-success")) {
+        $(event).removeClass("btn-success");
+        $(event).addClass("btn-warning")
+        // Add comment in text area
+        var comment = doubtText + $(`#${id_comment}`).val();
+        $(`#${id_comment}`).val(comment);
+    } else {
+        $(event).removeClass("btn-warning");
+        $(event).addClass("btn-success");
+        var comment = $(`#${id_comment}`).val();
+        comment = comment.replace(doubtText, "");
+        $(`#${id_comment}`).val(comment)
+    }
     deactivateSubmitBtn();
-    renderCommentText();
 };

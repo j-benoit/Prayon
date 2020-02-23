@@ -7,8 +7,10 @@ from crispy_forms.layout import HTML, Column, Field, Layout, Row, Submit
 from django import forms
 from django.core.validators import EmailValidator, RegexValidator
 from django.utils.dateparse import parse_duration
+from django.forms.widgets import HiddenInput
 
 from .models import ExtractSAP, Work_data
+from .utils import has_group
 
 
 class UpdatedInfoForm(forms.ModelForm):
@@ -17,7 +19,8 @@ class UpdatedInfoForm(forms.ModelForm):
     check_ext_ref = forms.BooleanField(required=False, initial=True)
     check_old_num = forms.BooleanField(required=False, initial=True)
     check_num_imp = forms.BooleanField(required=False, initial=True)
-    backlog_comment = forms.CharField(widget=forms.Textarea, required=False,)
+    check_num_trav = forms.BooleanField(required=False, initial=True)
+    backlog_comment = forms.CharField(widget=forms.Textarea(attrs={'rows':5,}), required=False)
     chronotime = forms.CharField()
 
     class Meta:
@@ -56,7 +59,7 @@ class UpdatedInfoForm(forms.ModelForm):
         )
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super(UpdatedInfoForm, self).__init__(*args, **kwargs)
         self.helper = FormHelper()
         self.helper.attrs = {"name": "chronoForm"}
         for field_name, field in self.fields.items():
@@ -64,6 +67,46 @@ class UpdatedInfoForm(forms.ModelForm):
 
         # self.helper.form_show_labels = False
         self.fields["typ"].label = False
+
+        # Get comment from Work_data
+        record = Work_data.objects.get(id_SAP__pk=self.instance.pk)
+        self.fields["backlog_comment"].initial = record.comment
+        self.fields["chronotime"].initial = record.time_tracking
+
+        # Initialize fields if record is OPEN
+        if record.status != 'OPEN':
+            test_fields = ["entreprise",
+                    "fournisseur",
+                    "ext_ref",
+                    "old_num",
+                    "num_imp",
+                    "num_trav"]
+            for test_field in test_fields:
+                if not getattr(record.id_SAP, test_field):
+                    self.fields["check_" + test_field].initial = False
+                    self.fields[test_field].disabled = True
+                else:
+                    self.fields["check_" + test_field].initial = True
+                    self.fields[test_field].disabled = False
+
+        # Set visibibilty depending of content
+        test_fields = ["poste",
+                       "P1",
+                       "P2",
+                       "P3",
+                       "P4",
+                       "P5",
+                       "P6"]
+        for test_field in test_fields:
+            if not getattr(record.id_SAP, test_field):
+                if test_field == "poste":
+                    self.fields["label_Poste"].widget = HiddenInput()
+                    self.fields["label_Poste"].label = ""
+                else:
+                    self.fields["label_" + test_field].widget = HiddenInput()
+                    self.fields["label_" + test_field].label = ""
+                self.fields[test_field].widget = HiddenInput()
+                self.fields[test_field].label = ""
 
         self.helper.layout = Layout(
             Row(
@@ -73,6 +116,7 @@ class UpdatedInfoForm(forms.ModelForm):
                     "check_ext_ref",
                     "check_old_num",
                     "check_num_imp",
+                    "check_num_trav",
                     css_class="col col-md-1 mb-0",
                 ),
                 Column(
@@ -205,7 +249,7 @@ class UpdatedInfoForm(forms.ModelForm):
                                 StrictButton(
                                     "?",
                                     css_class="btn-success",
-                                    onclick='handleDoubtField(this, "num_ip")',
+                                    onclick='handleDoubtField(this, "num_imp")',
                                 ),
                                 template="trackdrawing/custom_input_btn.html",
                                 required=True,
@@ -377,20 +421,17 @@ class UpdatedInfoForm(forms.ModelForm):
                     HTML(
                         '<a class="btn btn-success" href={% url "show_image" num_cadastre=form.instance.pk%} target="pdfview" onClick="chronoStart()" id="id_view">View Drawing</a>'
                     ),
-                    # StrictButton('View Drawing', css_class="btn btn-success",  onClick="chronoStart()", name="startstop"),
                     StrictButton(
                         "Pause timer",
                         css_class="btn btn-success",
                         onClick="chronoStart()",
                         name="startstop",
                     ),
-                    # HTML('<a class="btn btn-secondary" href={% url "backlog"  pk=form.instance.pk  %} id="id_view"><i class="fas fa-arrow-alt-circle-right"></i>Backlog</a>'),
                     HTML(
                         '<button type="submit" class="btn btn-secondary" name="backlog">'
                         '<i class="fas fa-arrow-alt-circle-right"></i>Backlog'
                         "</button>"
                     ),
-                    # Submit('backlog', 'Backlog'),
                     css_class="col-md-10 mb-0",
                 ),
                 Column(
@@ -407,12 +448,13 @@ class UpdatedInfoForm(forms.ModelForm):
 
     def clean(self):
         if "submit" in self.data:
-            # do submit
-            pass
+            record = Work_data.objects.get(id_SAP__pk=self.instance.pk)
+            record.comment = self.data["backlog_comment"]
+            record.status = "CLOSED"
+            record.save()
         elif "backlog" in self.data:
             record = Work_data.objects.get(id_SAP__pk=self.instance.pk)
             record.comment = self.data["backlog_comment"]
-            record.time_tracking = parse_duration(self.data["chronotime"])
             record.status = "BACKLOG"
             record.save()
 
@@ -475,7 +517,7 @@ class UpdatedInfoForm(forms.ModelForm):
         value_field = self.cleaned_data[field_name]
         is_fournisseur = self.data.get("check_{}".format(field_name), "off")
 
-        if not self.find_punctuation(value_field):
+        if not self.find_punctuation(value_field) and is_fournisseur == "on":
             raise forms.ValidationError("Merci de supprimer les ponctuations")
 
         if not self.cleaned_data[field_name] and is_fournisseur == "on":
@@ -494,7 +536,7 @@ class UpdatedInfoForm(forms.ModelForm):
         value_field = self.cleaned_data[field_name]
         is_fournisseur = self.data.get("check_{}".format(field_name), "off")
 
-        if self.find_punctuation(value_field):
+        if self.find_punctuation(value_field) and is_fournisseur == "on":
             raise forms.ValidationError("Merci de supprimer les ponctuations")
 
         if not self.cleaned_data[field_name] and is_fournisseur == "on":
@@ -513,7 +555,7 @@ class UpdatedInfoForm(forms.ModelForm):
         value_field = self.cleaned_data[field_name]
         is_fournisseur = self.data.get("check_{}".format(field_name), "off")
 
-        if not self.num_trav_format(value_field):
+        if not self.num_trav_format(value_field) and is_fournisseur == "on":
             raise forms.ValidationError(
                 "Merci de renseigner le champ comme ceci : NNNN/NN"
             )

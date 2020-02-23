@@ -1,0 +1,9 @@
+{% extends 'trackdrawing/PageTemplate.html' %}
+{% load render_table from django_tables2 %}
+{% block mainframe %}
+
+<h1>Liste des plans traités</h1>
+{% render_table table %}
+
+<br>
+{% endblock %}

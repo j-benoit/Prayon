@@ -134,12 +134,14 @@ class Work_data(models.Model):
         ('INVALID', 'INVALID'),
     ]
     id_SAP = models.OneToOneField(ExtractSAP, on_delete=models.PROTECT)
-    id_user = models.ForeignKey(User, on_delete=models.PROTECT)
+    id_user = models.ForeignKey(User, on_delete=models.PROTECT,  related_name='requests_created')
+    id_checker = models.ForeignKey(User, on_delete=models.PROTECT,  related_name='requests_checked', null=True)
     status = models.CharField(max_length=7, choices=DRAWING_STATUS, default='OPEN')
     created_date = models.DateField(auto_now_add=True)
     modified_date = models.DateField(auto_now=True)
     comment = models.TextField(blank=True)
     time_tracking = models.DurationField(default=timedelta(), blank=True)
+    check_time_tracking = models.DurationField(default=timedelta(), blank=True)
 
 
 class Project_history(models.Model):
@@ -150,6 +152,7 @@ class Project_history(models.Model):
     backlog_drawings = models.IntegerField(verbose_name='Plans au Backlog', blank=True, null=True)
     closed_drawings = models.IntegerField(verbose_name='Plans Fermés', blank=True, null=True)
     checked_drawings = models.IntegerField(verbose_name='Plans Vérifiés', blank=True, null=True)
+    invalid_drawings = models.IntegerField(verbose_name='Plans invalides', blank=True, null=True)
     avg_closed_time = models.DurationField(blank=True, null=True)
     avg_backlog_time = models.DurationField(blank=True, null=True)
 
@@ -170,6 +173,9 @@ class Project_history(models.Model):
                                                         status='CLOSED').count()
         record.checked_drawings = Work_data.objects.filter(id_user=instance.id_user, modified_date__lte=timezone.now().date(),
                                                         status='CHECKED').count()
+        record.invalid_drawings = Work_data.objects.filter(id_user=instance.id_user,
+                                                           modified_date__lte=timezone.now().date(),
+                                                           status='INVALID').count()
         record.avg_closed_time = Work_data.objects.filter(id_user=instance.id_user, modified_date__lte=timezone.now().date(),
                                                           status='CLOSED').aggregate(Avg('time_tracking'))['time_tracking__avg']
         record.avg_backlog_time = \
