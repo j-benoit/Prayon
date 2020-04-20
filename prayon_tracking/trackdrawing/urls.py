@@ -31,8 +31,9 @@ urlpatterns = [
     url(r'^Backlog', views.ListBacklog.as_view(), name='Backlog'),
     url(r'^work', views.Dispatch_Work, name='work'),
     url(r'^test', views.Test, name='test'),
+    url(r'^Export', views.Export_Database, name='Export'),
     url(r'^checker', views.nbChecker, name='checker'),
     url(r'^Admin', views.Admin, name='Admin'),
-    url(r'^GroupUser', views.GroupUser, name='GroupUser'),
+    # url(r'^GroupUser', views.GroupUser, name='GroupUser'),
     url(r'^UpdateData$', views.UpdatedInfoCreate.as_view(), name='update_data'),
 ]

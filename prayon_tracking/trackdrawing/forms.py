@@ -5,21 +5,16 @@ from crispy_forms.bootstrap import FieldWithButtons, StrictButton
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Field, Layout, Row, Submit
 from django import forms
-from django.core.validators import EmailValidator, RegexValidator
+from django.core.validators import EmailValidator, RegexValidator, ProhibitNullCharactersValidator
 from django.utils.dateparse import parse_duration
 from django.forms.widgets import HiddenInput
+from django.core.exceptions import ValidationError
 
 from .models import ExtractSAP, Work_data
 from .utils import has_group
 
 
 class UpdatedInfoForm(forms.ModelForm):
-    check_entreprise = forms.BooleanField(required=False, initial=True)
-    check_fournisseur = forms.BooleanField(required=False, initial=True)
-    check_ext_ref = forms.BooleanField(required=False, initial=True)
-    check_old_num = forms.BooleanField(required=False, initial=True)
-    check_num_imp = forms.BooleanField(required=False, initial=True)
-    check_num_trav = forms.BooleanField(required=False, initial=True)
     backlog_comment = forms.CharField(widget=forms.Textarea(attrs={'rows':5,}), required=False)
     chronotime = forms.CharField()
 
@@ -34,11 +29,13 @@ class UpdatedInfoForm(forms.ModelForm):
             "title",
             "date",
             "author",
-            "entreprise",
+            "tag",
             "fournisseur",
             "ext_ref",
             "old_num",
+            "ordre_nv",
             "num_cadastre",
+            "rev_cadastre",
             "poste",
             "label_Poste",
             "P1",
@@ -68,26 +65,18 @@ class UpdatedInfoForm(forms.ModelForm):
         # self.helper.form_show_labels = False
         self.fields["typ"].label = False
 
+        self.fields["old_num"].validators = [
+            RegexValidator('[:,!.?;]', message="Merci de supprimer les ponctuations", inverse_match=True)]
+        self.fields["num_imp"].validators = [
+            RegexValidator('[:,!.?;]', message="Merci de supprimer les ponctuations", inverse_match=True)]
+        # self.fields["num_trav"].validators = [
+        #     RegexValidator('(\d{1,4})?/(\d{2})?$', message="Merci de renseigner le champ comme ceci : NNNN/NN")]
+
         # Get comment from Work_data
         record = Work_data.objects.get(id_SAP__pk=self.instance.pk)
-        self.fields["backlog_comment"].initial = record.comment
+        comment = record.comment
+        self.fields["backlog_comment"].initial = comment
         self.fields["chronotime"].initial = record.time_tracking
-
-        # Initialize fields if record is OPEN
-        if record.status != 'OPEN':
-            test_fields = ["entreprise",
-                    "fournisseur",
-                    "ext_ref",
-                    "old_num",
-                    "num_imp",
-                    "num_trav"]
-            for test_field in test_fields:
-                if not getattr(record.id_SAP, test_field):
-                    self.fields["check_" + test_field].initial = False
-                    self.fields[test_field].disabled = True
-                else:
-                    self.fields["check_" + test_field].initial = True
-                    self.fields[test_field].disabled = False
 
         # Set visibibilty depending of content
         test_fields = ["poste",
@@ -111,12 +100,6 @@ class UpdatedInfoForm(forms.ModelForm):
         self.helper.layout = Layout(
             Row(
                 Column(
-                    "check_entreprise",
-                    "check_fournisseur",
-                    "check_ext_ref",
-                    "check_old_num",
-                    "check_num_imp",
-                    "check_num_trav",
                     css_class="col col-md-1 mb-0",
                 ),
                 Column(
@@ -127,7 +110,7 @@ class UpdatedInfoForm(forms.ModelForm):
                                 template="trackdrawing/custom_inputs.html",
                                 readonly=True,
                             ),
-                            css_class="form-label-group col-md-4 mb-0",
+                            css_class="form-label-group col-md-3 mb-0",
                         ),
                         Column(
                             Field(
@@ -135,7 +118,7 @@ class UpdatedInfoForm(forms.ModelForm):
                                 template="trackdrawing/custom_inputs.html",
                                 readonly=True,
                             ),
-                            css_class="form-group col-md-4 mb-0",
+                            css_class="form-group col-md-3 mb-0",
                         ),
                         Column(
                             Field(
@@ -143,13 +126,39 @@ class UpdatedInfoForm(forms.ModelForm):
                                 template="trackdrawing/custom_inputs.html",
                                 readonly=True,
                             ),
-                            css_class="form-group col-md-4 mb-0",
+                            css_class="form-group col-md-3 mb-0",
+                        ),
+                        Column(
+                            FieldWithButtons(
+                                "rev_cadastre",
+                                StrictButton(
+                                    "?",
+                                    css_class=self.choose_btn_class("rev_cadastre", comment),
+                                    onclick='handleDoubtField(this, "rev_cadastre")',
+                                ),
+                                template="trackdrawing/custom_input_btn.html",
+                            ),
+                            css_class="form-group col-md-3 mb-0",
                         ),
                         css_class="form-label-group",
                     ),
                     Row(
-                        # Column(Field('typ', template="trackdrawing/custom_select.html"), css_class='col-md-4 mb-0'),
-                        Column("typ", required=True, css_class="col-md-4 mb-0"),
+                        Column(
+                            Row(
+                                Column("typ", required=True, css_class="col-md-11 mb-0"),
+                                Column(
+                                    StrictButton(
+                                        "?",
+                                        # css_class="btn-success" ,
+                                        css_class=self.choose_btn_class("typ", comment),
+                                        name="btn_typ",
+                                        onclick='handleDoubtField(this, "typ")',
+                                    ),
+                                    css_class="col-md-1 mb-0",
+                                ),
+                            ),
+                            css_class="col-md-4 mb-0"
+                        ),
                         Column(
                             Field("num", template="trackdrawing/custom_inputs.html"),
                             css_class="form-group col-md-4 mb-0",
@@ -162,42 +171,53 @@ class UpdatedInfoForm(forms.ModelForm):
                     ),
                     Row(
                         Column(
-                            Field(
+                            FieldWithButtons(
                                 "title",
-                                template="trackdrawing/custom_inputs.html",
-                                required=True,
+                                StrictButton(
+                                    "?",
+                                    css_class=self.choose_btn_class("title", comment),
+                                    onclick='handleDoubtField(this, "title")',
+                                ),
+                                template="trackdrawing/custom_input_btn.html",
                             ),
-                            css_class="col-md-10 mb-0",
+                            css_class="col-md-8 mb-0",
                         ),
                         Column(
-                            Field(
+                            FieldWithButtons(
                                 "date",
-                                template="trackdrawing/custom_inputs.html",
-                                required=True,
+                                StrictButton(
+                                    "?",
+                                    css_class=self.choose_btn_class("date", comment),
+                                    onclick='handleDoubtField(this, "date")',
+                                ),
+                                template="trackdrawing/custom_input_btn.html",
                             ),
-                            css_class="form-group col-md-1 mb-0",
+                            css_class="form-group col-md-2 mb-0",
                         ),
                         Column(
-                            Field(
+                            FieldWithButtons(
                                 "author",
-                                template="trackdrawing/custom_inputs.html",
-                                required=True,
+                                StrictButton(
+                                    "?",
+                                    css_class=self.choose_btn_class("author", comment),
+                                    onclick='handleDoubtField(this, "author")',
+                                ),
+                                template="trackdrawing/custom_input_btn.html",
                             ),
-                            css_class="form-group col-md-1 mb-0",
+                            css_class="form-group col-md-2 mb-0",
                         ),
                         css_class="form-label-group",
                     ),
                     Row(
                         Column(
                             FieldWithButtons(
-                                "entreprise",
+                                "tag",
                                 StrictButton(
                                     "?",
-                                    css_class="btn-success",
-                                    onclick='handleDoubtField(this, "entreprise")',
+                                    css_class=self.choose_btn_class("tag", comment),
+                                    onclick='handleDoubtField(this, "tag")',
                                 ),
                                 template="trackdrawing/custom_input_btn.html",
-                                required=True,
                             ),
                             css_class="form-group col-md-3 mb-0",
                         ),
@@ -206,7 +226,7 @@ class UpdatedInfoForm(forms.ModelForm):
                                 "fournisseur",
                                 StrictButton(
                                     "?",
-                                    css_class="btn-success",
+                                    css_class=self.choose_btn_class("fournisseur", comment),
                                     onclick='handleDoubtField(this, "fournisseur")',
                                 ),
                                 template="trackdrawing/custom_input_btn.html",
@@ -219,7 +239,7 @@ class UpdatedInfoForm(forms.ModelForm):
                                 "ext_ref",
                                 StrictButton(
                                     "?",
-                                    css_class="btn-success",
+                                    css_class=self.choose_btn_class("ext_ref", comment),
                                     onclick='handleDoubtField(this, "ext_ref")',
                                 ),
                                 template="trackdrawing/custom_input_btn.html",
@@ -232,7 +252,7 @@ class UpdatedInfoForm(forms.ModelForm):
                                 "old_num",
                                 StrictButton(
                                     "?",
-                                    css_class="btn-success",
+                                    css_class=self.choose_btn_class("old_num", comment),
                                     onclick='handleDoubtField(this, "old_num")',
                                 ),
                                 template="trackdrawing/custom_input_btn.html",
@@ -248,7 +268,7 @@ class UpdatedInfoForm(forms.ModelForm):
                                 "num_imp",
                                 StrictButton(
                                     "?",
-                                    css_class="btn-success",
+                                    css_class=self.choose_btn_class("num_imp", comment),
                                     onclick='handleDoubtField(this, "num_imp")',
                                 ),
                                 template="trackdrawing/custom_input_btn.html",
@@ -261,7 +281,7 @@ class UpdatedInfoForm(forms.ModelForm):
                                 "num_trav",
                                 StrictButton(
                                     "?",
-                                    css_class="btn-success",
+                                    css_class=self.choose_btn_class("num_trav", comment),
                                     onclick='handleDoubtField(this, "num_trav")',
                                 ),
                                 template="trackdrawing/custom_input_btn.html",
@@ -270,10 +290,20 @@ class UpdatedInfoForm(forms.ModelForm):
                             css_class="form-group col-md-4 mb-0",
                         ),
                         Column(
-                            Field(
-                                "file_exists",
-                                template="trackdrawing/custom_inputs.html",
+                            FieldWithButtons(
+                                "ordre_nv",
+                                StrictButton(
+                                    "?",
+                                    css_class=self.choose_btn_class("ordre_nv", comment),
+                                    onclick='handleDoubtField(this, "ordre_nv")',
+                                ),
+                                template="trackdrawing/custom_input_btn.html",
+                                required=True,
                             ),
+                            # Field(
+                            #     "file_exists",
+                            #     template="trackdrawing/custom_inputs.html",
+                            # ),
                             css_class="form-group col-md-4 mb-0",
                         ),
                         css_class="form-row",
@@ -413,25 +443,50 @@ class UpdatedInfoForm(forms.ModelForm):
                     ),
                     Row(
                         Column(
+                                StrictButton(
+                                "Fichier Illisible",
+                                css_class="btn btn-success",
+                                onClick="illisible(this)",
+                                name="btn_illisible",
+                            ),
+                            css_class="form-group col-md-3 mb-0"
+                        ),
+                        Column(
+                            StrictButton(
+                                "Schéma électrique",
+                                css_class="btn btn-success",
+                                onClick="electrique(this)",
+                                name="btn_elec",
+                            ),
+                            css_class="form-group col-md-3 mb-0"
+                        ),
+                        Column(
+                            StrictButton(
+                                "Fichier mauvaise qualité",
+                                css_class="btn btn-success",
+                                onClick="qualite(this)",
+                                name="btn_qualite",
+                            ),
+                            css_class="form-group col-md-3 mb-0"
+                        ),
+                        Column(
+                            StrictButton(
+                                "Numéro de cadastre",
+                                css_class="btn btn-success",
+                                onClick="cadastre(this)",
+                                name="btn_num_cadatsre",
+                            ),
+                            css_class="form-group col-md-3 mb-0"
+                        ),
+                        css_class="form-row",
+                    ),
+                    Row(
+                        Column(
                             "backlog_comment", css_class="form-group col-md-12 mb-0"
                         ),
                         css_class="form-row",
                     ),
-                    Submit("submit", "Submit"),
-                    HTML(
-                        '<a class="btn btn-success" href={% url "show_image" num_cadastre=form.instance.pk%} target="pdfview" onClick="chronoStart()" id="id_view">View Drawing</a>'
-                    ),
-                    StrictButton(
-                        "Pause timer",
-                        css_class="btn btn-success",
-                        onClick="chronoStart()",
-                        name="startstop",
-                    ),
-                    HTML(
-                        '<button type="submit" class="btn btn-secondary" name="backlog">'
-                        '<i class="fas fa-arrow-alt-circle-right"></i>Backlog'
-                        "</button>"
-                    ),
+
                     css_class="col-md-10 mb-0",
                 ),
                 Column(
@@ -446,138 +501,63 @@ class UpdatedInfoForm(forms.ModelForm):
             ),
         )
 
-    def clean(self):
-        if "submit" in self.data:
-            record = Work_data.objects.get(id_SAP__pk=self.instance.pk)
-            record.comment = self.data["backlog_comment"]
-            record.status = "CLOSED"
-            record.save()
-        elif "backlog" in self.data:
-            record = Work_data.objects.get(id_SAP__pk=self.instance.pk)
-            record.comment = self.data["backlog_comment"]
-            record.status = "BACKLOG"
-            record.save()
-
-    def clean_entreprise(self):
-        """
-        Validate that the supplied fournisseur field is not empty if associated checkbox is True
-       """
-
-        print("TCL: self.cleaned_data", self.cleaned_data)
-
-        field_name = "entreprise"
-        value_field = self.cleaned_data[field_name]
-        is_fournisseur = self.data.get("check_{}".format(field_name), "off")
-
-        if not self.cleaned_data[field_name] and is_fournisseur == "on":
-            alert_no_value = (
-                "Merci de remplir le champ demandé ou de cocher la case en question"
-            )
-            raise forms.ValidationError(alert_no_value)
-
-        return value_field
-
-    def clean_fournisseur(self):
-        """
-       Validate that the supplied fournisseur field is not empty if associated checkbox is True
-       """
-        field_name = "fournisseur"
-        value_field = self.cleaned_data[field_name]
-        is_fournisseur = self.data.get("check_{}".format(field_name), "off")
-
-        if not self.cleaned_data[field_name] and is_fournisseur == "on":
-            alert_no_value = (
-                "Merci de remplir le champ demandé ou de cocher la case en question"
-            )
-            raise forms.ValidationError(alert_no_value)
-
-        return value_field
-
-    def clean_ext_ref(self):
-        """
-       Validate that the supplied fournisseur field is not empty if associated checkbox is True
-       """
-        field_name = "ext_ref"
-        value_field = self.cleaned_data[field_name]
-        is_fournisseur = self.data.get("check_{}".format(field_name), "off")
-
-        if not self.cleaned_data[field_name] and is_fournisseur == "on":
-            alert_no_value = (
-                "Merci de remplir le champ demandé ou de cocher la case en question"
-            )
-            raise forms.ValidationError(alert_no_value)
-
-        return value_field
-
-    def clean_old_num(self):
-        """
-       Validate that the supplied fournisseur field is not empty if associated checkbox is True
-       """
-        field_name = "old_num"
-        value_field = self.cleaned_data[field_name]
-        is_fournisseur = self.data.get("check_{}".format(field_name), "off")
-
-        if not self.find_punctuation(value_field) and is_fournisseur == "on":
-            raise forms.ValidationError("Merci de supprimer les ponctuations")
-
-        if not self.cleaned_data[field_name] and is_fournisseur == "on":
-            alert_no_value = (
-                "Merci de remplir le champ demandé ou de cocher la case en question"
-            )
-            raise forms.ValidationError(alert_no_value)
-
-        return value_field
-
-    def clean_num_imp(self):
-        """
-       Validate that the supplied fournisseur field is not empty if associated checkbox is True
-       """
-        field_name = "num_imp"
-        value_field = self.cleaned_data[field_name]
-        is_fournisseur = self.data.get("check_{}".format(field_name), "off")
-
-        if self.find_punctuation(value_field) and is_fournisseur == "on":
-            raise forms.ValidationError("Merci de supprimer les ponctuations")
-
-        if not self.cleaned_data[field_name] and is_fournisseur == "on":
-            alert_no_value = (
-                "Merci de remplir le champ demandé ou de cocher la case en question"
-            )
-            raise forms.ValidationError(alert_no_value)
-
-        return value_field
-
-    def clean_num_trav(self):
-        """
-       Validate that the supplied fournisseur field is not empty if associated checkbox is True
-       """
-        field_name = "num_trav"
-        value_field = self.cleaned_data[field_name]
-        is_fournisseur = self.data.get("check_{}".format(field_name), "off")
-
-        if not self.num_trav_format(value_field) and is_fournisseur == "on":
-            raise forms.ValidationError(
-                "Merci de renseigner le champ comme ceci : NNNN/NN"
+        if self.instance.status in ['OPEN', 'CLOSED', 'BACKLOG']:
+            self.helper.layout.append(
+                Row(
+                    Column(css_class="col col-md-1 mb-0", ),
+                    Column(
+                        Row(
+                            Submit("submit", "Submit"),
+                            HTML(
+                                '<a class="btn btn-success" href={% url "show_image" num_cadastre=form.instance.pk%} target="pdfview" onClick="chronoStart()" id="id_view">View Drawing</a>'
+                            ),
+                            # StrictButton(
+                            #     "Pause timer",
+                            #     css_class="btn btn-success",
+                            #     onClick="chronoStart()",
+                            #     name="startstop",
+                            # ),
+                            HTML(
+                                '<button type="submit" class="btn btn-secondary" name="backlog">'
+                                '<i class="fas fa-arrow-alt-circle-right"></i>Backlog'
+                                "</button>"
+                            ),
+                            css_class="form-row",
+                        )
+                        , css_class="col col-md-10 mb-0",
+                    ),
+                    Column(css_class="col col-md-1 mb-0", ),
+                ),
             )
 
-        return value_field
-
-    def no_value(self, field_name, text):
-        checked_field = self.data.get("check_{}".format(field_name), "off")
-
-        if not self.cleaned_data[field_name] and checked_field == "on":
-            alert_no_value = (
-                "Merci de remplir le champ demandé ou de cocher la case en question"
+        if self.instance.status in ['CHECKED', 'INVALID']:
+            self.helper.layout.append(
+                Row(
+                    Column(css_class="col col-md-1 mb-0", ),
+                    Column(
+                        Row(
+                            HTML(
+                                '<a class="btn btn-success" href={% url "show_image" num_cadastre=form.instance.pk%} target="pdfview" id="id_view">View Drawing</a>'
+                            ),
+                            css_class="form-row",
+                        )
+                        , css_class="col col-md-10 mb-0",
+                    ),
+                    Column(css_class="col col-md-1 mb-0", ),
+                ),
             )
 
-    def find_punctuation(self, text):
-        pattern = "[:,!.?;]"
-        result = re.search(pattern, text)
-        return not result
 
-    def num_trav_format(self, text):
-        pattern = "(\d{1,4})?/(\d{2})?$"
-        result = re.match(pattern, text)
+    def choose_btn_class(self, field, comment):
+        if "[" + field.upper() + "]" in comment:
+            return "btn-warning"
+        else:
+            return "btn-success"
 
-        return result
+    def clean_typ(self):
+        typ = self.cleaned_data['typ']
 
+        if not typ:
+            raise ValidationError('Le type est obligatoire')
+
+        return typ

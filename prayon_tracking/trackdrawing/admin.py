@@ -15,9 +15,9 @@ class ExtractSAPResource(resources.ModelResource):
         model = ExtractSAP
 
 
-class Updated_InfoResource(resources.ModelResource):
-    class Meta:
-        model = Updated_info
+# class Updated_InfoResource(resources.ModelResource):
+#     class Meta:
+#         model = Updated_info
 
 
 class WorkDataResource(resources.ModelResource):
@@ -34,7 +34,7 @@ class ProjecthistoryResource(resources.ModelResource):
 # Define class for Import/Export in admin panel
 class TypeAdmin(ImportExportModelAdmin):
     resource_class = TypeResource
-    # list_display = ('id', 'category',)
+    list_display = ('id','code', 'desc',)
     ordering = ('id',)
 
 
@@ -43,9 +43,9 @@ class ExtractSAPAdmin(ImportExportModelAdmin):
     ordering = ('id',)
 
 
-class Updated_InfoAdmin(ImportExportModelAdmin):
-    resource_class = Updated_InfoResource
-    ordering = ('id',)
+# class Updated_InfoAdmin(ImportExportModelAdmin):
+#     resource_class = Updated_InfoResource
+#     ordering = ('id',)
 
 
 class WorkDataAdmin(ImportExportModelAdmin):
@@ -63,7 +63,7 @@ class ProjecthistoryAdmin(ImportExportModelAdmin):
 # Register your models here.
 admin.site.register(Type, TypeAdmin)
 admin.site.register(ExtractSAP, ExtractSAPAdmin)
-admin.site.register(Updated_info, Updated_InfoAdmin)
+# admin.site.register(Updated_info, Updated_InfoAdmin)
 admin.site.register(Work_data, WorkDataAdmin)
 admin.site.register(Project_history, ProjecthistoryAdmin)
 admin.site.register(communData)

@@ -15,7 +15,7 @@ class ExtractTable(tables.Table):
         fields = ("title", "num_cadastre")
 
 class WorkTable(tables.Table):
-    id_SAP__num_cadastre = tables.LinkColumn('edit_data', args=[A('pk')])
+    id_SAP__num_cadastre = tables.LinkColumn('edit_data', args=[A('id_SAP__pk')])
     class Meta:
         model = Work_data
         template_name = 'trackdrawing/TableRender.html'
@@ -25,3 +25,4 @@ class WorkTable(tables.Table):
                  }
         #fields = ("id_SAP.title", "id_SAP.num_cadastre")
         fields = ("id_SAP__title", "id_SAP__num_cadastre", "status", 'comment')
+
