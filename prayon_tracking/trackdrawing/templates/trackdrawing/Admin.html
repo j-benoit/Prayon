@@ -2,6 +2,12 @@
 {% load Auth_extra %}
 
 {% block mainframe %}
+<h2>Export Data to Excel File</h2>
+<div>
+	<form action="{% url 'Export' %}" method="post">{% csrf_token %}
+	    <input type="submit" class="btn btn-primary" value="Export">
+	</form>
+</div>
 <h2>Modify user group</h2>
 <div>
 <form method="POST"> {% csrf_token %}

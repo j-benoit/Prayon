@@ -1,60 +1,53 @@
 {% extends 'trackdrawing/PageTemplate.html' %}
 {% load render_table from django_tables2 %}
 {% block mainframe %}
-<div class="row ">
-	<div class="col col-md-10">
-		<div class="row text-center">
-			<div id="line_chart" style="width: 75%">
+<div class="row">
+	<div class="col col-md-5">
+		<div class="row d-flex justify-content-center">
+			<div id="line_chart" style="width: 100%">
 				<embed type="image/svg+xml" src= {{ chart_line|safe }} />
 			</div>
 		</div>
-		<div class="row text-center">
-				{{ AverageTimeTable|safe }}
+		<br>
+		<br>
+		<div class="row d-flex justify-content-center">
+			<button class="btn btn-primary flex-fill" type="button" data-toggle="collapse" data-target="#collapseAverageTimeTable" aria-expanded="false" aria-controls="collapseAverageTimeTable">User progression</button>
+		</div>
+		<div class="row d-flex justify-content-center">
+			<div class="collapse multi-collapse" id="collapseAverageTimeTable">
+				<div class="card card-body">
+					{{ AverageTimeTable|safe }}
+				</div>
+			</div>
+		</div>
+
+	</div>
+	<div class="col col-md-5">
+		<div class="row d-flex justify-content-center">
+			<div id="line_chart" style="width: 100%">
+				<embed type="image/svg+xml" src= {{ chart_xy|safe }} />
+			</div>
+		</div>
+		<br>
+		<br>
+		<div class="row d-flex justify-content-center">
+			<button class="btn btn-primary flex-fill" type="button" data-toggle="collapse" data-target="#collapseTable_summary" aria-expanded="false" aria-controls="collapseTable_summary">Team progression</button>
+		</div>
+		<div class="rowd-flex justify-content-center collapse multi-collapse" id="collapseTable_summary">
+			<div class="card card-body">
+				{{ Table_summary|safe }}
+			</div>
 		</div>
 	</div>
+
 	<div class="col col-md-2">
 		<form action="" method="get">
 			{{ history_filter.form.as_p }}
 			<input type="submit" />
 		</form>
 	</div>
-</div>
-
-	<div id="line_chart" style="width: 75%">
-	    <embed type="image/svg+xml" src= {{ chart_xy|safe }} />
-	</div>
-
-	<div >
-		<table class="table">
-			<thead>
-				<tr>
-					<th scope="col"></th>
-					<th scope="col">Temps moyen par plan closed</th>
-					<th scope="col">Temps moyen par plan backlog</th>
-					<th scope="col">Temps moyen total par plan</th>
-
-				</tr>
-			</thead>
-			<tbody>
-				
-				{% for values in temp_total %}
-					<tr>
-						{% for val in values %}
-							<td>{{val}}</td>
-						{% endfor%}
-					</tr>
-				{% endfor%}
-			</tbody>
-		</table>
-		
-	</div>
-
-	
-
-	
 
 </div>
-
 
 {% endblock %}
 
