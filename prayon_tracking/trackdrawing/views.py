@@ -3,13 +3,14 @@ import operator
 from functools import reduce
 from django.db.models import Q, Count
 from django.views.generic import ListView, CreateView, UpdateView
+from django.views import View
 from django.contrib.auth.models import User, Group
 from django.core.files.storage import FileSystemStorage
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
-from django.http import HttpResponse, HttpResponseNotFound, FileResponse
+from django.http import HttpResponse, HttpResponseNotFound, FileResponse, HttpResponseRedirect
 from .models import ExtractSAP, Work_data, Project_history, communData
-from .forms import UpdatedInfoForm
+from .forms import UpdatedInfoForm, ShowDistinct
 from django.contrib.auth.decorators import login_required
 from itertools import cycle
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -33,6 +34,8 @@ import pygal
 from datetime import date, timedelta
 import random
 import os
+
+import logging
 
 try:
     from io import BytesIO as IO # for modern python
@@ -62,8 +65,8 @@ def Test (request):
     # Modify_drawing_status()
     # Modify_drawing_status_from_csv()
     # Delete_record_from_csv()
-    from .check import check_database
-    check_database()
+    # from .check import check_database
+    # check_database()
 
     return redirect('Admin')
 
@@ -258,29 +261,6 @@ def Delete_record_from_csv():
             print("status of Extract SAP id %d has been modified to OPEN" %record_to_suppress.id_SAP.pk)
     record = Work_data.objects.get(id=53)
     record.save()
-
-
-# def GroupUser (request):
-#     print(request.POST)
-#     groups = [x.name for x in Group.objects.all()]
-#     myUSers= User.objects.all()
-#     for us in myUSers :
-#         for gr in us.groups.all():
-#             for key in request.POST.keys():
-#                 key = key.split("_")
-#                 if key[0] in groups:
-#                     if us.username == key[1]:
-#                         try:
-#                              us.groups.clear()
-#                         except Exception as e:
-#                             raise e
-#                         try:
-#                             us.groups.add(Group.objects.get(name=key[0]))
-#                         except Exception as e:
-#                             raise e
-#
-#         # us.save()
-#     return redirect('Admin')
 
 
 def Admin(request):
@@ -620,6 +600,72 @@ class UpdatedInfoCreate(UpdateView):
         record.save()
         form.instance.status = record.status
         return super(UpdatedInfoCreate, self).form_valid(form)
+
+
+class FilterDatabase(View):
+    form_class = ShowDistinct
+    template_name = 'trackdrawing/db_view.html'
+    status = ['CLOSED', 'BACKLOG', 'CHECKED', 'INVALID']
+
+    def get(self, request, *args, **kwargs):
+        form1 = self.form_class()
+        return render(request, self.template_name, {'form': form1})
+
+    def post(self, request, *args, **kwargs):
+        # print(request.POST)
+        form1 = self.form_class(request.POST)
+        # if form1.is_valid():
+        if "submit" in request.POST:
+            if request.POST['contains']:
+                search_field = request.POST['field_choice'] +'__contains'
+                records = ExtractSAP.objects.filter(**{'status__in': self.status,
+                                                       search_field: request.POST['contains']}).values(request.POST['field_choice']).annotate(count=Count(request.POST['field_choice'])).order_by(request.POST['field_choice'])
+            else:
+                records = ExtractSAP.objects.filter(status__in=self.status).values(request.POST['field_choice']).annotate(count=Count(request.POST['field_choice'])).order_by(request.POST['field_choice'])
+
+            # print(records)
+            return render(request, self.template_name, {'form': form1, 'records': records})
+
+        if "Modify" in request.POST:
+            # print(request.POST)
+            list_to_mod = request.POST.getlist("queryselection", "")
+            champ = request.POST.get('field_choice')
+            search = request.POST.get('contains')
+            new_value = request.POST.get('new_value')
+            initial_dict = {
+                "field_choice": champ,
+                "contains": search,
+            }
+            # form1 = self.form_class(request.POST or None, initial=initial_dict)
+            form1 = self.form_class(request.POST, initial=initial_dict)
+            # print('I am Here')
+            # print(list_to_mod)
+            SAP_log = logging.getLogger('ExtractSAP')
+            SAP_log.setLevel(logging.INFO)
+            SAPHandler = logging.FileHandler('ExtractSAP.log')
+            formatter = logging.Formatter('%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
+            SAPHandler.setFormatter(formatter)
+
+            SAP_log.addHandler(SAPHandler)
+
+            for item in list_to_mod:
+                champ_exact = champ + '__exact'
+                records = ExtractSAP.objects.filter(**{'status__in': self.status,
+                                                       champ_exact: item})
+                for record in records:
+                    SAP_id = str(record.pk)
+                    old_value = getattr(record, champ)
+                    if new_value:
+                        SAP_log.info('SAP_id: ' + SAP_id + ' champ ' + champ + ' ' + old_value + ' changed to ' + new_value)
+                        # record.author = new_value
+                        setattr(record, champ, new_value)
+                        record.save()
+
+            SAP_log.removeHandler(SAPHandler)
+            SAPHandler.close()
+            return render(request, self.template_name, {'form': form1})
+
+        # return render(request, self.template_name, {'form': form1})
 
 
 def DisplayDrawing(request, num_cadastre):

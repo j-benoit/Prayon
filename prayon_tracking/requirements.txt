@@ -27,3 +27,4 @@ jinja2==2.11.1
 django-filter==2.2.0
 xlsxwriter==1.2.8
 pyspellchecker==0.5.4
+pygal==2.4.0

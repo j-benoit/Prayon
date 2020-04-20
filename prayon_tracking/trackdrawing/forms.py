@@ -14,6 +14,48 @@ from .models import ExtractSAP, Work_data
 from .utils import has_group
 
 
+class ShowDistinct(forms.ModelForm):
+    FIELD_CHOICE = [
+        ('author', 'Author'),
+        ('fournisseur', 'Entreprise')
+    ]
+    field_choice = forms.ChoiceField(choices = FIELD_CHOICE)
+    contains = forms.CharField(required=False)
+
+    class Meta:
+        model=ExtractSAP
+        fields = (
+            "field_choice",
+            "contains",
+        )
+
+    def __init__(self, *args, **kwargs):
+        super(ShowDistinct, self).__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.disable_csrf = True
+        self.helper.form_show_labels = True
+        self.helper.layout = Layout(
+            Row(
+                Column(
+                    Field(
+                        "field_choice",
+                    ),
+                    css_class="form-label col-md-3 mb-0",
+                ),
+                Column(
+                    Field(
+                        "contains",
+                        # template="trackdrawing/custom_inputs.html",
+                    ),
+                    css_class="form-group col-md-9 mb-0",
+                ),
+                css_class="form-label",
+            ),
+            Submit("submit", "Submit"),
+        )
+
+
 class UpdatedInfoForm(forms.ModelForm):
     backlog_comment = forms.CharField(widget=forms.Textarea(attrs={'rows':5,}), required=False)
     chronotime = forms.CharField()

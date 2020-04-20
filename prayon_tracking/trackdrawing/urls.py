@@ -34,6 +34,7 @@ urlpatterns = [
     url(r'^Export', views.Export_Database, name='Export'),
     url(r'^checker', views.nbChecker, name='checker'),
     url(r'^Admin', views.Admin, name='Admin'),
+    url(r'^ViewDB', views.FilterDatabase.as_view(), name='viewdb'),
     # url(r'^GroupUser', views.GroupUser, name='GroupUser'),
     url(r'^UpdateData$', views.UpdatedInfoCreate.as_view(), name='update_data'),
 ]
