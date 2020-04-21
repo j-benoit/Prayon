@@ -26,3 +26,20 @@ class WorkTable(tables.Table):
         #fields = ("id_SAP.title", "id_SAP.num_cadastre")
         fields = ("id_SAP__title", "id_SAP__num_cadastre", "status", 'comment')
 
+
+class CheckExtractTable(tables.Table):
+    num_cadastre = tables.LinkColumn('edit_data', args=[A('pk')])
+    title =tables.Column(
+        attrs={'td': {'class': 'record_title', 'data-pk': lambda record: record.id, 'data-name': 'title', 'data-type':'textarea'}})
+    class Meta:
+        model = ExtractSAP
+        template_name = 'trackdrawing/TableRender.html'
+        attrs = {"class": "table-striped table-bordered table-sm",
+                 'tbody': {'id': 'ExtractTable'},
+                 'search_form': {'id': 'ExtractTable_search_form_id'},
+                 }
+        row_attrs = {
+            'data_id': lambda record: record.pk,
+        }
+        fields = ("title", "num_cadastre")
+

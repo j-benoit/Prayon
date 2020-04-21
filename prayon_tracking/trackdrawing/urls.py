@@ -37,4 +37,6 @@ urlpatterns = [
     url(r'^ViewDB', views.FilterDatabase.as_view(), name='viewdb'),
     # url(r'^GroupUser', views.GroupUser, name='GroupUser'),
     url(r'^UpdateData$', views.UpdatedInfoCreate.as_view(), name='update_data'),
+
+    url(r'^xed_post$', views.xed_post, name='xed_post'),
 ]

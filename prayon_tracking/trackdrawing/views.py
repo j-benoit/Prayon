@@ -8,7 +8,7 @@ from django.contrib.auth.models import User, Group
 from django.core.files.storage import FileSystemStorage
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
-from django.http import HttpResponse, HttpResponseNotFound, FileResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseNotFound, FileResponse, HttpResponseRedirect, JsonResponse
 from .models import ExtractSAP, Work_data, Project_history, communData
 from .forms import UpdatedInfoForm, ShowDistinct
 from django.contrib.auth.decorators import login_required
@@ -16,10 +16,12 @@ from itertools import cycle
 from django.contrib.auth.mixins import LoginRequiredMixin
 from .filters import Project_historyFilter
 from django.utils.dateparse import parse_duration
+from django.apps import apps
+from django.db.models import ForeignKey
 
 
 from django_tables2 import SingleTableView
-from .tables import ExtractTable, WorkTable
+from .tables import ExtractTable, WorkTable, CheckExtractTable
 
 from PIL import Image
 import img2pdf
@@ -622,6 +624,12 @@ class FilterDatabase(View):
                                                        search_field: request.POST['contains']}).values(request.POST['field_choice']).annotate(count=Count(request.POST['field_choice'])).order_by(request.POST['field_choice'])
             else:
                 records = ExtractSAP.objects.filter(status__in=self.status).values(request.POST['field_choice']).annotate(count=Count(request.POST['field_choice'])).order_by(request.POST['field_choice'])
+            if request.POST['field_choice']=='title':
+                search_field = request.POST['field_choice'] + '__contains'
+                records = ExtractSAP.objects.filter(**{'status__in': self.status,
+                                                       search_field: request.POST['contains']})
+                table = CheckExtractTable(records)
+                return render(request, self.template_name, {'form': form1, 'records': records, 'table': table})
 
             # print(records)
             return render(request, self.template_name, {'form': form1, 'records': records})
@@ -717,3 +725,59 @@ def DisplayDrawing(request, num_cadastre):
         return HttpResponseNotFound('The requested pdf was not found in our server.')
     # return render(request, 'trackdrawing/ExtractSAP_list.html', locals())
 
+
+def xed_post(request):
+    """
+    X-Editable: handle post request to change the value of an attribute of an object
+
+    request.POST['model']: name of Django model of which an object will be changed
+    request.POST['pk']: pk of object to be changed
+    request.POST['name']: name of the field to be set
+    request.POST['value']: new value to be set
+    """
+    try:
+        if not 'name' in request.POST or not 'pk' in request.POST or not 'value' in request.POST:
+            _data = {'success': False, 'error_msg': 'Error, missing POST parameter'}
+            return JsonResponse(_data)
+
+        _model = apps.get_model('trackdrawing', request.POST['model'])  # Grab the Django model
+        _obj = _model.objects.filter(pk=request.POST['pk']).first()  # Get the object to be changed
+        old_value = getattr(_obj, request.POST['name'])
+        # print(request.POST['model'], request.POST['pk'], request.POST['name'], request.POST['value'])
+        fk_model = get_fk_model(_model, request.POST['name'])
+        if fk_model:
+            setattr(_obj, request.POST['name'], fk_model.objects.get(id=request.POST['value'])) # Actually change the attribute to the new value
+        else:
+            setattr(_obj, request.POST['name'], request.POST['value'])  # Actually change the attribute to the new value
+        #
+        # Record modification to log file
+        #
+        SAP_log = logging.getLogger('ExtractSAP')
+        SAP_log.setLevel(logging.INFO)
+        SAPHandler = logging.FileHandler('ExtractSAP.log')
+        formatter = logging.Formatter('%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
+        SAPHandler.setFormatter(formatter)
+
+        SAP_log.addHandler(SAPHandler)
+        SAP_log.info('SAP_id: ' + request.POST['pk'] + ' champ ' + request.POST['name'] + ' ' + old_value + ' changed to ' + request.POST['value'])
+
+        _obj.save()  # And save to DB
+
+        _data = {'success': True}
+        return JsonResponse(_data)
+
+    # Catch issues like object does not exist (wrong pk) or other
+    except Exception as e:
+        _data = {'success': False,
+                'error_msg': f'Exception: {e}'}
+        return JsonResponse(_data)
+
+
+def get_fk_model(model, fieldname):
+    '''returns None if not foreignkey, otherswise the relevant model'''
+    field_object = model._meta.get_field(fieldname)
+    direct = not field_object.auto_created or field_object.concrete
+    m2m = field_object.many_to_many
+    if not m2m and direct and isinstance(field_object, ForeignKey):
+        return field_object.related_model
+    return None

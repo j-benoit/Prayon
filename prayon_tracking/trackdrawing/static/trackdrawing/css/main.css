@@ -1,3 +1,18 @@
 .display_chrono {
     display: none;
 }
+
+.ACCORD_NOMBRE { background-color:#ffffb3; }
+.FR_SPELLING_RULE { background-color:#b3ccff; }
+.ESPACE_UNITES { background-color:#ccffcc; }
+
+/* Make inline editables take the full width of their parents */
+.editable-container.editable-inline,
+.editable-container.editable-inline .control-group.form-group,
+.editable-container.editable-inline .control-group.form-group .editable-input text,
+.editable-container.editable-inline .control-group.form-group .editable-input textarea,
+.editable-container.editable-inline .control-group.form-group .editable-input select,
+.editable-container.editable-inline .control-group.form-group .editable-input input:not([type=radio]):not([type=checkbox]):not([type=submit])
+{
+    width: 100%;
+}

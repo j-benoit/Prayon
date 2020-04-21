@@ -17,7 +17,8 @@ from .utils import has_group
 class ShowDistinct(forms.ModelForm):
     FIELD_CHOICE = [
         ('author', 'Author'),
-        ('fournisseur', 'Entreprise')
+        ('fournisseur', 'Entreprise'),
+        ('title', 'titre')
     ]
     field_choice = forms.ChoiceField(choices = FIELD_CHOICE)
     contains = forms.CharField(required=False)
