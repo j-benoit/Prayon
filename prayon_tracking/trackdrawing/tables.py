@@ -14,6 +14,27 @@ class ExtractTable(tables.Table):
                  }
         fields = ("title", "num_cadastre")
 
+
+class ExtractTableExpanded(tables.Table):
+    # id = tables.Column()
+    # title = tables.Column()
+    # num_cadastre = tables.Column()
+    # status = tables.Column()
+    # comment = tables.Column(empty_values=())
+    #
+    # def render_comment(self, record):
+    #     return Work_data.objects.get(id_SAP=record.pk).comment
+
+    class Meta:
+        model = Work_data
+        template_name = 'trackdrawing/TableRender.html'
+        attrs = {"class": "table-striped table-bordered table-sm",
+                 'tbody': {'id': 'ExtractTableExpanded'},
+                 'search_form': {'id': 'ExtractTableExpanded_search_form_id'},
+                 }
+        fields = ("id", "id_SAP__title", "id_SAP__num_cadastre", "status", "comment")
+
+
 class WorkTable(tables.Table):
     id_SAP__num_cadastre = tables.LinkColumn('edit_data', args=[A('id_SAP__pk')])
     class Meta:

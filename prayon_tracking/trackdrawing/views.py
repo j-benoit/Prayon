@@ -14,14 +14,14 @@ from .forms import UpdatedInfoForm, ShowDistinct
 from django.contrib.auth.decorators import login_required
 from itertools import cycle
 from django.contrib.auth.mixins import LoginRequiredMixin
-from .filters import Project_historyFilter
+from .filters import Project_historyFilter, ExtractSAPFilter
 from django.utils.dateparse import parse_duration
 from django.apps import apps
 from django.db.models import ForeignKey
 
 
 from django_tables2 import SingleTableView
-from .tables import ExtractTable, WorkTable, CheckExtractTable
+from .tables import ExtractTable, WorkTable, CheckExtractTable, ExtractTableExpanded
 
 from PIL import Image
 import img2pdf
@@ -568,6 +568,19 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
             return table_data
 
 
+class ChangeDatabase(View):
+    template_name = 'trackdrawing/db_filter_view.html'
+    table_class = ExtractTableExpanded
+
+    def get(self, request, *args, **kwargs):
+        db_filter = ExtractSAPFilter(request.GET, queryset=Work_data.objects.all()) #, queryset=ExtractSAP.objects.all())
+        if 'typ' in request.GET: # and request.GET['typ']:
+            table = ExtractTableExpanded(db_filter.qs)
+            return render(request, self.template_name, {'filter': db_filter, 'table': table})
+        else:
+            return render(request, self.template_name, {'filter': db_filter})
+
+
 class UpdatedInfoCreate(UpdateView):
     model = ExtractSAP
     template_name = "trackdrawing/UpdatedInfo.html"
@@ -607,7 +620,7 @@ class UpdatedInfoCreate(UpdateView):
 class FilterDatabase(View):
     form_class = ShowDistinct
     template_name = 'trackdrawing/db_view.html'
-    status = ['CLOSED', 'BACKLOG', 'CHECKED', 'INVALID']
+    status = ['CLOSED',  'CHECKED', 'INVALID']
 
     def get(self, request, *args, **kwargs):
         form1 = self.form_class()
@@ -762,7 +775,8 @@ def xed_post(request):
         SAP_log.info('SAP_id: ' + request.POST['pk'] + ' champ ' + request.POST['name'] + ' ' + old_value + ' changed to ' + request.POST['value'])
 
         _obj.save()  # And save to DB
-
+        SAP_log.removeHandler(SAPHandler)
+        SAPHandler.close()
         _data = {'success': True}
         return JsonResponse(_data)
 
