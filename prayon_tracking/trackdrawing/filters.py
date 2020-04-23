@@ -32,7 +32,7 @@ class Project_historyFilter(filters.FilterSet):
 class ExtractSAPFilter(filters.FilterSet):
     TYPE_CHOICES = tuple(Type.objects.values_list('pk', 'desc'))
 
-    typ = filters.ChoiceFilter(field_name='id_SAP__typ', choices= TYPE_CHOICES)
+    typ = filters.ChoiceFilter(field_name='id_SAP__typ', choices= TYPE_CHOICES, label='Type')
     comment = filters.CharFilter(field_name='comment', lookup_expr='contains')
     title_contains = filters.CharFilter(field_name='id_SAP__title', lookup_expr='contains', label='Title Contains')
 

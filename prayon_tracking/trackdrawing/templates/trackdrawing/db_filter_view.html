@@ -12,6 +12,11 @@
 
     {% if table %}
         Query has returned {{table.rows|length}} records:
+        <form action="" method="post">
+            {% csrf_token %}
+            <input type="text" id="comments" name="comment" value="[POSTRAIT " style="width: 400px"/>   <input type="submit" value="Add all records to re-check state"/>
+        </form>
+
         {% render_table table %}
     {% endif %}
 

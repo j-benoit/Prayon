@@ -11,6 +11,7 @@ from django.forms.widgets import HiddenInput
 from django.core.exceptions import ValidationError
 
 from .models import ExtractSAP, Work_data
+from .tables import LiasseTable
 from .utils import has_group
 
 
@@ -118,6 +119,10 @@ class UpdatedInfoForm(forms.ModelForm):
         # Get comment from Work_data
         record = Work_data.objects.get(id_SAP__pk=self.instance.pk)
         comment = record.comment
+        if '[POSTRAIT' in comment:
+            liasse = self.instance.num_cadastre[:7]
+            record_liasse = ExtractSAP.objects.filter(num_cadastre__startswith=liasse)
+            self.table_liasse = LiasseTable(record_liasse)
         self.fields["backlog_comment"].initial = comment
         self.fields["chronotime"].initial = record.time_tracking
 
@@ -544,7 +549,7 @@ class UpdatedInfoForm(forms.ModelForm):
             ),
         )
 
-        if self.instance.status in ['OPEN', 'CLOSED', 'BACKLOG']:
+        if self.instance.status in ['OPEN', 'CLOSED', 'BACKLOG', 'TO_RE-CHECK']:
             self.helper.layout.append(
                 Row(
                     Column(css_class="col col-md-1 mb-0", ),

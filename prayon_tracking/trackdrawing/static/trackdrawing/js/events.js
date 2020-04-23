@@ -27,16 +27,19 @@ const disbaleInput = element => {
 const deactivateSubmitBtn = () => {
     let submitButton = document.querySelector("#submit-id-submit");
     submitButton.removeAttribute("disabled", "");
+    console.log($("button.btn-warning").length)
 
-    doubtFields.forEach(field => {
-        if (!field.checked) {
-            submitButton.setAttribute("disabled", "");
-        }
-    });
+    if ($("button.btn-warning").length != 0) {
+        submitButton.setAttribute("disabled", "");
+    }
 };
 
 $(":checkbox").change(function() {
     disbaleInput(this);
+});
+
+$( document ).ready(function() {
+    deactivateSubmitBtn();
 });
 
 const handleDoubtField = (event, field) => {
@@ -57,4 +60,76 @@ const handleDoubtField = (event, field) => {
         $(`#${id_comment}`).val(comment)
     }
     deactivateSubmitBtn();
+};
+
+const illisible = (event, field) => {
+    const doubtText = `[ERROR] = Fichier Illisible\n`;
+    const id_comment = "id_backlog_comment";
+    if ($(event).hasClass("btn-success")) {
+        $(event).removeClass("btn-success");
+        $(event).addClass("btn-secondary")
+        // Add comment in text area
+        var comment = doubtText + $(`#${id_comment}`).val();
+        $(`#${id_comment}`).val(comment);
+    } else {
+        $(event).removeClass("btn-secondary");
+        $(event).addClass("btn-success");
+        var comment = $(`#${id_comment}`).val();
+        comment = comment.replace(doubtText, "");
+        $(`#${id_comment}`).val(comment)
+    }
+};
+
+const electrique = (event, field) => {
+    const doubtText = `[ERROR] = Schéma électrique\n`;
+    const id_comment = "id_backlog_comment";
+    if ($(event).hasClass("btn-success")) {
+        $(event).removeClass("btn-success");
+        $(event).addClass("btn-secondary")
+        // Add comment in text area
+        var comment = doubtText + $(`#${id_comment}`).val();
+        $(`#${id_comment}`).val(comment);
+    } else {
+        $(event).removeClass("btn-secondary");
+        $(event).addClass("btn-success");
+        var comment = $(`#${id_comment}`).val();
+        comment = comment.replace(doubtText, "");
+        $(`#${id_comment}`).val(comment)
+    }
+};
+
+const qualite = (event, field) => {
+    const doubtText = `[ERROR] = Fichier mauvaise qualité\n`;
+    const id_comment = "id_backlog_comment";
+    if ($(event).hasClass("btn-success")) {
+        $(event).removeClass("btn-success");
+        $(event).addClass("btn-secondary")
+        // Add comment in text area
+        var comment = doubtText + $(`#${id_comment}`).val();
+        $(`#${id_comment}`).val(comment);
+    } else {
+        $(event).removeClass("btn-secondary");
+        $(event).addClass("btn-success");
+        var comment = $(`#${id_comment}`).val();
+        comment = comment.replace(doubtText, "");
+        $(`#${id_comment}`).val(comment)
+    }
+};
+
+const cadastre = (event, field) => {
+    const doubtText = `[ERROR] = Numéro de cadastre différent de la base de donnée\n`;
+    const id_comment = "id_backlog_comment";
+    if ($(event).hasClass("btn-success")) {
+        $(event).removeClass("btn-success");
+        $(event).addClass("btn-secondary")
+        // Add comment in text area
+        var comment = doubtText + $(`#${id_comment}`).val();
+        $(`#${id_comment}`).val(comment);
+    } else {
+        $(event).removeClass("btn-secondary");
+        $(event).addClass("btn-success");
+        var comment = $(`#${id_comment}`).val();
+        comment = comment.replace(doubtText, "");
+        $(`#${id_comment}`).val(comment)
+    }
 };

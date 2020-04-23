@@ -6,40 +6,40 @@
 
 {% block mainframe %}
     <form method="post" >
-    {% csrf_token %}
+        {% csrf_token %}
 
-    {% crispy form %}
+        {% crispy form %}
 
-    <br>
-    <br>
-    Query has returned {{records|length}} records:
-    <br>
-    <br>
         {% if table %}
+            <br>
+            <br>
+            Query has returned {{records|length}} records:
+            <br>
+            <br>
             {% render_table table %}
         {% else%}
-        <table class="table">
-            <thead>
-                <tr>
-                    {% for field in records.0 %}
-                        <th>{{field}}</th>
-                    {% endfor %}
-                    <th>Select</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for element in records %}
+            <table class="table">
+                <thead>
                     <tr>
-                        {% for field, value in element.items %}
-                            <td> {{value}}</td>
+                        {% for field in records.0 %}
+                            <th>{{field}}</th>
                         {% endfor %}
-                        <td><input type="checkbox" id="selectquery" name="queryselection" value="{{element|dict_first}}"></td>
+                        <th>Select</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        Replace complete field with :
-        <input type="text" id="new value" name="new_value"/><input type="submit" name="Modify" value="Modify" class="btn btn-primary" id="submit-id-submit"/>
+                </thead>
+                <tbody>
+                    {% for element in records %}
+                        <tr>
+                            {% for field, value in element.items %}
+                                <td> {{value}}</td>
+                            {% endfor %}
+                            <td><input type="checkbox" id="selectquery" name="queryselection" value="{{element|dict_first}}"></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            Replace complete field with :
+            <input type="text" id="new value" name="new_value"/><input type="submit" name="Modify" value="Modify" class="btn btn-primary" id="submit-id-submit"/>
         {% endif %}
     </form>
 

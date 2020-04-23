@@ -481,6 +481,8 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
 
     def get_table_data(self):
         if(has_group(self.request.user,'Check')) :
+            # L'utilisateur connecté fait parti du groupe checker,
+            # On récupère sa liste de plan à checker
             nb_plan_c_max = communData.objects.get(pk=1).nb_plan_check
             date_jour = date.today()
             date_veille = date_jour - timedelta(1 if date_jour.weekday() != 0 else 3)
@@ -532,16 +534,13 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
 
                 return tmp_table_data
         else:
+            # L'utilisateur connecté ne fait pas partie du groupe checker
+            # On récupère sa liste de plan au status OPEN
             user_drawing_list = [record.id_SAP.pk for record in Work_data.objects.filter(id_user__pk=self.request.user.id, status='OPEN')]
             table_data = ExtractSAP.objects.filter(id__in=user_drawing_list)
             if table_data.count() == 0:
-                # Affect new drawing automaticaly
-                # already_dispatched_records = [record.id_SAP.pk for record in Work_data.objects.all()]
-                # for record in ExtractSAP.objects.all():
-                #     if record.pk not in already_dispatched_records:
-                #         records = record
-                #         break
-                # records = [record for record in Work_data.objects.all() if record.id_SAP.pk not in already_dispatched_records]
+                # L'utilisateur n'a plus de plan affecté
+                # On lui affecte automatiquement une nouvelle liasse
                 next_drawing = ExtractSAP.objects.all().exclude(status__in=[
                         'OPEN',
                         'BACKLOG',
@@ -549,21 +548,39 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
                         'CHECKED',
                         'INVALID',
                     ]).order_by('id')[:1]
-                next_ref = next_drawing[0].num_cadastre[:7]
-                # record_to_dispatched = ExtractSAP.objects.filter(num_cadastre__startswith=next_ref).order_by('id')
-                record_to_dispatched = ExtractSAP.objects.filter(num_cadastre__startswith=next_ref).exclude(status__in=[
-                        'OPEN',
-                        'BACKLOG',
-                        'CLOSED',
-                        'CHECKED',
-                        'INVALID',
-                    ]).order_by('id')
-                for record in record_to_dispatched:
-                    Work_data.objects.create(id_SAP=record, id_user=self.request.user, status='OPEN')
-                    sap = ExtractSAP.objects.get(id=record.pk)
-                    sap.status ='OPEN'
-                    sap.save()
-                return record_to_dispatched
+                if next_drawing.count() != 0:
+                    # ==> il reste des plans à produire
+                    next_ref = next_drawing[0].num_cadastre[:7]
+                    # record_to_dispatched = ExtractSAP.objects.filter(num_cadastre__startswith=next_ref).order_by('id')
+                    record_to_dispatched = ExtractSAP.objects.filter(num_cadastre__startswith=next_ref).exclude(status__in=[
+                            'OPEN',
+                            'BACKLOG',
+                            'CLOSED',
+                            'CHECKED',
+                            'INVALID',
+                        ]).order_by('id')
+                    for record in record_to_dispatched:
+                        Work_data.objects.create(id_SAP=record, id_user=self.request.user, status='OPEN')
+                        sap = ExtractSAP.objects.get(id=record.pk)
+                        sap.status ='OPEN'
+                        sap.save()
+                    return record_to_dispatched
+                else:
+                    # il n'y a plus de plans à produire, on passe à la phase POSTRAIT
+                    user_drawing_list = [record.id_SAP.pk for record in
+                                         Work_data.objects.filter(id_rechecker__pk=self.request.user.id, status='TO_RE-CHECK')]
+                    table_data = ExtractSAP.objects.filter(id__in=user_drawing_list)
+                    if table_data.count() == 0:
+                        next_drawing = Work_data.objects.filter(status='TO_RE-CHECK').order_by('id')[:1]
+                        if next_drawing:
+                            next_ref = next_drawing[0].id_SAP.num_cadastre[:7]
+                            record_to_dispatched = ExtractSAP.objects.filter(num_cadastre__startswith=next_ref, status='TO_RE-CHECK')
+                            for record in record_to_dispatched:
+                                oWork_data = Work_data.objects.get(id_SAP=record.pk)
+                                oWork_data.id_rechecker = User.objects.get(pk=self.request.user.id)
+                                oWork_data.save()
+
+                    return record_to_dispatched
 
             return table_data
 
@@ -573,12 +590,39 @@ class ChangeDatabase(View):
     table_class = ExtractTableExpanded
 
     def get(self, request, *args, **kwargs):
-        db_filter = ExtractSAPFilter(request.GET, queryset=Work_data.objects.all()) #, queryset=ExtractSAP.objects.all())
+        db_filter = ExtractSAPFilter(request.GET, queryset=Work_data.objects.all())
         if 'typ' in request.GET: # and request.GET['typ']:
             table = ExtractTableExpanded(db_filter.qs)
             return render(request, self.template_name, {'filter': db_filter, 'table': table})
         else:
             return render(request, self.template_name, {'filter': db_filter})
+
+    def post(self, request, *args, **kwargs):
+        db_filter = ExtractSAPFilter(request.GET, queryset=Work_data.objects.all())
+        new_status = 'TO_RE-CHECK'
+        SAP_log = logging.getLogger('StatusModification')
+        SAP_log.setLevel(logging.INFO)
+        SAPHandler = logging.FileHandler('StatusModification.log')
+        formatter = logging.Formatter('%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
+        SAPHandler.setFormatter(formatter)
+
+        SAP_log.addHandler(SAPHandler)
+
+        for record in db_filter.qs:
+            # Modify work_data status & save
+            record.comment = request.POST['comment'] + '\n' + record.comment
+            record.status = new_status
+            record.save()
+            # Modify Extract SAP status & save
+            SAP_record = ExtractSAP.objects.get(id=record.id_SAP.pk)
+            SAP_record.status = new_status
+            SAP_record.save()
+            SAP_log.info('Workdata id ' + str(record.pk) + '(' + str(SAP_record.pk) + ')' + ' status changed to re-check')
+
+        SAP_log.removeHandler(SAPHandler)
+        SAPHandler.close()
+
+        return render(request, self.template_name, {'filter': db_filter})
 
 
 class UpdatedInfoCreate(UpdateView):
@@ -588,12 +632,19 @@ class UpdatedInfoCreate(UpdateView):
     success_url =reverse_lazy('accueil')
 
     def form_valid(self, form):
+        SAP_log = logging.getLogger('RecheckModifications')
+        SAP_log.setLevel(logging.INFO)
+        SAPHandler = logging.FileHandler('RecheckModifications.log')
+        formatter = logging.Formatter('%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
+        SAPHandler.setFormatter(formatter)
+        SAP_log.addHandler(SAPHandler)
+
         form.instance.user = self.request.user
         record = Work_data.objects.get(id_SAP__pk=form.instance.pk)
         if form.instance.old_num:
             form.instance.remark = "Ancien plan: " + form.instance.old_num + "\n" + form.instance.remark
         data = form.cleaned_data
-        if has_group(form.instance.user, 'Check'):
+        if has_group(form.instance.user, 'Check') or record.status=='TO_RE-CHECK':
             # drawing is checked
             status = 'CHECKED'
             drawing = ExtractSAP.objects.get(pk=form.instance.pk)
@@ -601,7 +652,10 @@ class UpdatedInfoCreate(UpdateView):
                 if data[key] != getattr(drawing, key):
                     # One field has been modified by checker
                     status = 'INVALID'
-                    break
+                    if record.status=='TO_RE-CHECK':
+                        # log toute les modifs faites lors du re-check
+                        SAP_log.info('ExtractSAP id ' + str(drawing.pk) + ' : champ ' + key + ' changed from ' + getattr(drawing, key) +' to '+ data[key])
+                    # break
             record.status = status
             record.id_checker = form.instance.user
             record.check_time_tracking = parse_duration(data["chronotime"]) - record.time_tracking
@@ -614,6 +668,10 @@ class UpdatedInfoCreate(UpdateView):
         record.comment = form.data["backlog_comment"]
         record.save()
         form.instance.status = record.status
+
+        SAP_log.removeHandler(SAPHandler)
+        SAPHandler.close()
+
         return super(UpdatedInfoCreate, self).form_valid(form)
 
 

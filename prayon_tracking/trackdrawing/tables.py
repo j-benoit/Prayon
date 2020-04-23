@@ -12,18 +12,11 @@ class ExtractTable(tables.Table):
                  'tbody': {'id': 'ExtractTable'},
                  'search_form': {'id': 'ExtractTable_search_form_id'},
                  }
-        fields = ("title", "num_cadastre")
+        fields = ("title", "num_cadastre",)
 
 
 class ExtractTableExpanded(tables.Table):
-    # id = tables.Column()
-    # title = tables.Column()
-    # num_cadastre = tables.Column()
-    # status = tables.Column()
-    # comment = tables.Column(empty_values=())
-    #
-    # def render_comment(self, record):
-    #     return Work_data.objects.get(id_SAP=record.pk).comment
+    id_SAP__num_cadastre = tables.LinkColumn('show_image', args=[A('pk')], attrs={"a": {"target": "pdfview"}}, verbose_name='View drawing')
 
     class Meta:
         model = Work_data
@@ -32,7 +25,7 @@ class ExtractTableExpanded(tables.Table):
                  'tbody': {'id': 'ExtractTableExpanded'},
                  'search_form': {'id': 'ExtractTableExpanded_search_form_id'},
                  }
-        fields = ("id", "id_SAP__title", "id_SAP__num_cadastre", "status", "comment")
+        fields = ("id", "id_SAP__title", "id_SAP__num_cadastre", "id_SAP__typ__code", "status", "comment")
 
 
 class WorkTable(tables.Table):
@@ -64,3 +57,13 @@ class CheckExtractTable(tables.Table):
         }
         fields = ("title", "num_cadastre")
 
+class LiasseTable(tables.Table):
+    num_cadastre = tables.LinkColumn('show_image', args=[A('pk')], attrs={"a": {"target": "pdfview"}}, verbose_name='View drawing')
+    class Meta:
+        model = ExtractSAP
+        template_name = 'trackdrawing/TableRender.html'
+        attrs = {"class": "table-striped table-bordered table-sm",
+                 'tbody': {'id': 'ExtractTable'},
+                 'search_form': {'id': 'ExtractTable_search_form_id'},
+                 }
+        fields = ("title", "num_cadastre", 'typ')
