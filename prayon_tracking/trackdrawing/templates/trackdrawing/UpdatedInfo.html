@@ -4,7 +4,9 @@
 {% load render_table from django_tables2 %}
 
 {% block mainframe %}
-
+    {% if form.instance.status == 'CLOSED' or form.instance.status == 'TO_RE-CHECK' %}
+    <h3> Check Drawing</h3>
+    {% endif %}
     {% crispy form %}
     <br>
     {% if form.table_liasse %}

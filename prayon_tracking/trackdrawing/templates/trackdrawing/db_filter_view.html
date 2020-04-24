@@ -5,10 +5,7 @@
 {% load extras %}
 
 {% block mainframe %}
-    <form action="" method="get">
-        {{ filter.form.as_p }}
-        <input type="submit" />
-    </form>
+    {% crispy filter.form filter.helper %}
 
     {% if table %}
         Query has returned {{table.rows|length}} records:

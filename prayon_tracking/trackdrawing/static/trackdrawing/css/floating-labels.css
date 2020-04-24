@@ -40,10 +40,6 @@ body {
   padding: var(--input-padding-y) var(--input-padding-x);
 }
 
-.form-label-group > select,
-.form-label-group > label {
-  padding: var(--input-padding-y) var(--input-padding-x);
-}
 
 .form-label-group > label {
   position: absolute;
@@ -66,23 +62,13 @@ body {
   color: transparent;
 }
 
-.form-label-group select::-webkit-input-placeholder {
-  color: transparent;
-}
 
 .form-label-group input:-ms-input-placeholder {
   color: transparent;
 }
 
-.form-label-group select:-ms-input-placeholder {
-  color: transparent;
-}
 
 .form-label-group input::-ms-input-placeholder {
-  color: transparent;
-}
-
-.form-label-group select:-ms-input-placeholder {
   color: transparent;
 }
 
@@ -90,15 +76,7 @@ body {
   color: transparent;
 }
 
-.form-label-group select::-moz-placeholder {
-  color: transparent;
-}
-
 .form-label-group input::placeholder {
-  color: transparent;
-}
-
-.form-label-group select::placeholder {
   color: transparent;
 }
 
@@ -115,15 +93,3 @@ body {
   color: #777;
 }
 
-.form-label-group select:not(:placeholder-shown) {
-  padding-top: calc(var(--input-padding-y) + var(--input-padding-y) * (2 / 3));
-  padding-bottom: calc(var(--input-padding-y) / 3);
-}
-
-.form-label-group select:not(:placeholder-shown) ~ label {
-  padding-top: calc(var(--input-padding-y) / 3);
-  padding-bottom: calc(var(--input-padding-y) / 3);
-  font-size: 12px;
-  font-style: normal;
-  color: #777;
-}

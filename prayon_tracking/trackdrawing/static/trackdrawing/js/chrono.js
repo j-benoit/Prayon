@@ -32,7 +32,7 @@ function chrono(){
 function chronoStart(){
 	//document.chronoForm.startstop.value = "stop!"
 	$('#id_view').attr("onclick","");
-	document.chronoForm.startstop.onclick = chronoStop
+	//document.chronoForm.startstop.onclick = chronoStop
 	//document.chronoForm.reset.onclick = chronoReset
 	var startvalue = document.getElementById("id_chronotime").value
 	start = new Date()
@@ -45,7 +45,7 @@ function chronoStart(){
 }
 function chronoContinue(){
 	//document.chronoForm.startstop.value = "stop!"
-	document.chronoForm.startstop.onclick = chronoStop
+	//document.chronoForm.startstop.onclick = chronoStop
 	//document.chronoForm.reset.onclick = chronoReset
 	startOff = 0
 	start = new Date()-diff
@@ -59,11 +59,11 @@ function chronoReset(){
 }
 function chronoStopReset(){
 	document.getElementById("id_chronotime").value = "00:00:000"
-	document.chronoForm.startstop.onclick = chronoStart
+	//document.chronoForm.startstop.onclick = chronoStart
 }
 function chronoStop(){
 	//document.chronoForm.startstop.value = "start!"
-	document.chronoForm.startstop.onclick = chronoContinue
+	//document.chronoForm.startstop.onclick = chronoContinue
 	//document.chronoForm.reset.onclick = chronoStopReset
 	clearTimeout(timerID)
 }

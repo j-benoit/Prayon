@@ -9,7 +9,7 @@ from django.core.files.storage import FileSystemStorage
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.http import HttpResponse, HttpResponseNotFound, FileResponse, HttpResponseRedirect, JsonResponse
-from .models import ExtractSAP, Work_data, Project_history, communData
+from .models import ExtractSAP, Work_data, Project_history, communData, Type
 from .forms import UpdatedInfoForm, ShowDistinct
 from django.contrib.auth.decorators import login_required
 from itertools import cycle
@@ -65,7 +65,7 @@ def Dispatch_Work (request):
 
 def Test (request):
     # Modify_drawing_status()
-    # Modify_drawing_status_from_csv()
+    Modify_drawing_status_from_csv()
     # Delete_record_from_csv()
     # from .check import check_database
     # check_database()
@@ -79,6 +79,7 @@ def Export_Database(request):
         'id_SAP',
         'id_user__username',
         'id_checker__username',
+        'id_rechecker__username',
         'status',
         'created_date',
         'modified_date',
@@ -237,15 +238,30 @@ def Modify_drawing_status_from_csv():
     import csv
     with open('D:\\sapToBacklog.csv', 'r') as file:
         reader = csv.reader(file, delimiter='\t')
+        SAP_log = logging.getLogger('StatusModification')
+        SAP_log.setLevel(logging.INFO)
+        SAPHandler = logging.FileHandler('StatusModification.log')
+        formatter = logging.Formatter('%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
+        SAPHandler.setFormatter(formatter)
+
+        SAP_log.addHandler(SAPHandler)
+
         for row in reader:
             record = (int(row[0]))
             record_to_modify = Work_data.objects.get(id=record)
-            record_to_modify.status = 'BACKLOG'
+            record_to_modify.status = 'TO_RE-CHECK'
+            record_to_modify.id_rechecker = None
+            record_to_modify.comment = '[POSTRAIT SUMP]\n' + record_to_modify.comment
             recordSAP = ExtractSAP.objects.get(id=record_to_modify.id_SAP.pk)
-            recordSAP.status = 'BACKLOG'
+            recordSAP.status = 'TO_RE-CHECK'
             record_to_modify.save()
             recordSAP.save()
             print("status of Extract SAP id %d has been modified to BACKLOG" %record_to_modify.id_SAP.pk)
+
+            SAP_log.info(
+                'Workdata id ' + str(record_to_modify.pk) + '(' + str(recordSAP.pk) + ')' + ' status changed to re-check')
+        SAP_log.removeHandler(SAPHandler)
+        SAPHandler.close()
 
 
 def Delete_record_from_csv():
@@ -536,7 +552,7 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
         else:
             # L'utilisateur connecté ne fait pas partie du groupe checker
             # On récupère sa liste de plan au status OPEN
-            user_drawing_list = [record.id_SAP.pk for record in Work_data.objects.filter(id_user__pk=self.request.user.id, status='OPEN')]
+            user_drawing_list = [record.id_SAP.pk for record in Work_data.objects.filter(id_user__pk=self.request.user.id, status__in=['OPEN'])]
             table_data = ExtractSAP.objects.filter(id__in=user_drawing_list)
             if table_data.count() == 0:
                 # L'utilisateur n'a plus de plan affecté
@@ -547,6 +563,7 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
                         'CLOSED',
                         'CHECKED',
                         'INVALID',
+                        'TO_RE-CHECK',
                     ]).order_by('id')[:1]
                 if next_drawing.count() != 0:
                     # ==> il reste des plans à produire
@@ -558,6 +575,7 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
                             'CLOSED',
                             'CHECKED',
                             'INVALID',
+                            'TO_RE-CHECK',
                         ]).order_by('id')
                     for record in record_to_dispatched:
                         Work_data.objects.create(id_SAP=record, id_user=self.request.user, status='OPEN')
@@ -569,9 +587,9 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
                     # il n'y a plus de plans à produire, on passe à la phase POSTRAIT
                     user_drawing_list = [record.id_SAP.pk for record in
                                          Work_data.objects.filter(id_rechecker__pk=self.request.user.id, status='TO_RE-CHECK')]
-                    table_data = ExtractSAP.objects.filter(id__in=user_drawing_list)
-                    if table_data.count() == 0:
-                        next_drawing = Work_data.objects.filter(status='TO_RE-CHECK').order_by('id')[:1]
+                    record_to_dispatched = ExtractSAP.objects.filter(id__in=user_drawing_list)
+                    if record_to_dispatched.count() == 0:
+                        next_drawing = Work_data.objects.filter(id_rechecker=None, status='TO_RE-CHECK').order_by('id')[:1]
                         if next_drawing:
                             next_ref = next_drawing[0].id_SAP.num_cadastre[:7]
                             record_to_dispatched = ExtractSAP.objects.filter(num_cadastre__startswith=next_ref, status='TO_RE-CHECK')
@@ -590,7 +608,11 @@ class ChangeDatabase(View):
     table_class = ExtractTableExpanded
 
     def get(self, request, *args, **kwargs):
-        db_filter = ExtractSAPFilter(request.GET, queryset=Work_data.objects.all())
+        db_filter = ExtractSAPFilter(request.GET, queryset=Work_data.objects.filter(status__in=[
+                            'CLOSED',
+                            'CHECKED',
+                            'INVALID',
+                        ]))
         if 'typ' in request.GET: # and request.GET['typ']:
             table = ExtractTableExpanded(db_filter.qs)
             return render(request, self.template_name, {'filter': db_filter, 'table': table})
@@ -598,7 +620,11 @@ class ChangeDatabase(View):
             return render(request, self.template_name, {'filter': db_filter})
 
     def post(self, request, *args, **kwargs):
-        db_filter = ExtractSAPFilter(request.GET, queryset=Work_data.objects.all())
+        db_filter = ExtractSAPFilter(request.GET, queryset=Work_data.objects.filter(status__in=[
+                            'CLOSED',
+                            'CHECKED',
+                            'INVALID',
+                        ]))
         new_status = 'TO_RE-CHECK'
         SAP_log = logging.getLogger('StatusModification')
         SAP_log.setLevel(logging.INFO)
@@ -654,15 +680,20 @@ class UpdatedInfoCreate(UpdateView):
                     status = 'INVALID'
                     if record.status=='TO_RE-CHECK':
                         # log toute les modifs faites lors du re-check
-                        SAP_log.info('ExtractSAP id ' + str(drawing.pk) + ' : champ ' + key + ' changed from ' + getattr(drawing, key) +' to '+ data[key])
+                        if key == 'typ':
+                            SAP_log.info(
+                                'ExtractSAP id ' + str(drawing.pk) + ' : champ ' + key + ' changed from ' + getattr(
+                                    drawing, key).desc + ' to ' + Type.objects.get(id=data[key].pk).desc)
+                        else:
+                            SAP_log.info('ExtractSAP id ' + str(drawing.pk) + ' : champ ' + key + ' changed from ' + getattr(drawing, key) +' to '+ data[key])
                     # break
             record.status = status
             record.id_checker = form.instance.user
             record.check_time_tracking = parse_duration(data["chronotime"]) - record.time_tracking
-        elif "submit" in form.data:
+        else:
             record.status = "CLOSED"
             record.time_tracking = parse_duration(data["chronotime"])
-        elif "backlog" in form.data:
+        if "backlog" in form.data:
             record.status = "BACKLOG"
             record.time_tracking = parse_duration(data["chronotime"])
         record.comment = form.data["backlog_comment"]

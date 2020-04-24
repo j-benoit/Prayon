@@ -16,7 +16,7 @@ class ExtractTable(tables.Table):
 
 
 class ExtractTableExpanded(tables.Table):
-    id_SAP__num_cadastre = tables.LinkColumn('show_image', args=[A('pk')], attrs={"a": {"target": "pdfview"}}, verbose_name='View drawing')
+    id_SAP__num_cadastre = tables.LinkColumn('show_image', args=[A('id_SAP.pk')], attrs={"a": {"target": "pdfview"}}, verbose_name='View drawing')
 
     class Meta:
         model = Work_data

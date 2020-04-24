@@ -74,7 +74,7 @@ class ExtractSAP(models.Model):
     num_trav = models.CharField(max_length=100, verbose_name='N° de bon de travail', blank=True)
     file_exists = models.CharField(max_length=100, verbose_name='Existance fichier tif/pdf/dwg', blank=True)
 
-    status = models.CharField(max_length=7, blank=True, default='')
+    status = models.CharField(max_length=11, blank=True, default='')
 
     def __str__(self):
         return self.num_cadastre
