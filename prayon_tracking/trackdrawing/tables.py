@@ -4,6 +4,18 @@ from .models import ExtractSAP, Work_data
 from django.utils.safestring import mark_safe
 from django.utils.html import format_html
 
+
+def f_render_comment(commentaire):
+    commentaire = commentaire.replace('\n', '<br>')
+    commentaire = commentaire.replace(
+        '[POSTRAIT TYP INVALID]',
+        '<SPAN class="error_type">[POSTRAIT TYP INVALID]</SPAN>')
+    commentaire = commentaire.replace(
+        '[POSTRAIT TYP LIASSE]',
+        '<SPAN class="error_liasse">[POSTRAIT TYP LIASSE]</SPAN>')
+    return commentaire
+
+
 class ExtractTable(tables.Table):
     # Used on Home View
     title = tables.Column()
@@ -14,14 +26,7 @@ class ExtractTable(tables.Table):
 
     def render_comment(self, record):
         commentaire = Work_data.objects.get(id_SAP__pk=record.pk).comment
-        commentaire = commentaire.replace('\n', '<br>')
-        commentaire = commentaire.replace(
-            '[POSTRAIT TYP INVALID]',
-            '<SPAN class="error_type">[POSTRAIT TYP INVALID]</SPAN>')
-        commentaire = commentaire.replace(
-            '[POSTRAIT TYP LIASSE]',
-            '<SPAN class="error_liasse">[POSTRAIT TYP LIASSE]</SPAN>')
-        return mark_safe(commentaire.replace('\n', '<br>'))
+        return mark_safe(f_render_comment(commentaire).replace('\n', '<br>'))
 
     class Meta:
         # model = ExtractSAP
@@ -49,16 +54,36 @@ class ExtractTableExpanded(tables.Table):
 
 class WorkTable(tables.Table):
     # Used for Backlog View
+    id_SAP__title = tables.Column()
     id_SAP__num_cadastre = tables.LinkColumn('edit_data', args=[A('id_SAP__pk')])
+    status = tables.Column()
+    comment = tables.TemplateColumn('{{ record.text_field|linebreaksbr }}', verbose_name="Commentaires", empty_values=())
+    role = tables.TemplateColumn('{{ record.text_field }}', verbose_name="Role", empty_values=())
+
+    def render_role(self, record):
+        user = self.request.user
+        role = ''
+        if getattr(record, 'id_user', '') == user:
+            role = role + 'Owner<br>'
+        if getattr(record, 'id_checker', '') == user:
+            role = role + 'Checker<br>'
+        if getattr(record, 'id_rechecker', '') == user:
+            role = role + 'Re-Checker<br>'
+        return mark_safe(role)
+
+    def render_comment(self, record):
+        commentaire = record.comment
+        return mark_safe(f_render_comment(commentaire).replace('\n', '<br>'))
+
     class Meta:
-        model = Work_data
+        # model = Work_data
         template_name = 'trackdrawing/TableRender.html'
         attrs = {"class": "table-striped table-bordered table-sm",
                  'tbody': {'id': 'WorkTable'},
                  'search_form': {'id': 'WorkTable_search_form_id'},
                  }
         #fields = ("id_SAP.title", "id_SAP.num_cadastre")
-        fields = ("id_SAP__title", "id_SAP__num_cadastre", "status", 'comment')
+        fields = ("id_SAP__title", "id_SAP__num_cadastre", "role", "status", 'comment')
 
 
 class CheckExtractTable(tables.Table):

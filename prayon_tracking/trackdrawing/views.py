@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.views.generic import UpdateView
 from django.views import View
 from django.contrib.auth.models import User, Group
@@ -441,6 +441,11 @@ def Dashboard(request):
 
         return render(request, "trackdrawing/dashboradAdmin.html", locals())
     else:
+        recheck_today = Work_data.objects.filter(id_rechecker__pk = request.user.id).exclude(modified_date__lt=date.today())
+        recheck_before = Work_data.objects.filter(id_rechecker__pk=request.user.id, modified_date__lt=date.today())
+        count_recheck_today = {stat: len(recheck_today.filter(status=stat)) for stat in ['BACKLOG', 'CLOSED', 'CHECKED', 'INVALID', 'TO_RE-CHECK']}
+        count_recheck_before = {stat: len(recheck_before.filter(status=stat)) for stat in
+                               ['BACKLOG', 'CLOSED', 'CHECKED', 'INVALID', 'TO_RE-CHECK']}
         data = Project_history.objects.filter(id_user__pk=request.user.id)
         df = pd.DataFrame.from_records(data.values())
         df = df.sort_values('date', ascending=False)
@@ -479,10 +484,7 @@ class ListBacklog(LoginRequiredMixin,SingleTableView):
     # paginate_by = 10
 
     def get_table_data(self):
-        if has_group(self.request.user, 'CP'):
-            table_data = Work_data.objects.filter(id_checker__pk=self.request.user.id).exclude(status='OPEN')
-        else:
-            table_data = Work_data.objects.filter(id_user__pk=self.request.user.id).exclude(status='OPEN')
+        table_data = Work_data.objects.filter(Q(id_checker__pk=self.request.user.id) | Q(id_user__pk=self.request.user.id) | Q(id_rechecker__pk=self.request.user.id)).exclude(status='OPEN')
         return table_data
 
 

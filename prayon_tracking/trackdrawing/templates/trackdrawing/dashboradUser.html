@@ -1,8 +1,16 @@
 {% extends 'trackdrawing/PageTemplate.html' %}
 {% load render_table from django_tables2 %}
 {% block mainframe %}
-
-
+{% if count_recheck_before or count_recheck_today %}
+	<h3>RE-CHECK STATUS :</h3>
+	Statistisques des enregistrements assignés en re-check
+	<h4><br>
+	Yesterday: {{ count_recheck_before }}
+	<br>
+	Today: {{ count_recheck_today }}</h4>
+{% endif %}
+<br>
+<br>
 <table class="table">
 	<thead>
 		<tr>
