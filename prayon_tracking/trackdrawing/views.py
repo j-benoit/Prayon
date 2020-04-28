@@ -1,37 +1,32 @@
 from django.shortcuts import render
-import operator
-from functools import reduce
-from django.db.models import Q, Count
-from django.views.generic import ListView, CreateView, UpdateView
+from django.db.models import Count
+from django.views.generic import UpdateView
 from django.views import View
 from django.contrib.auth.models import User, Group
 from django.core.files.storage import FileSystemStorage
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
-from django.http import HttpResponse, HttpResponseNotFound, FileResponse, HttpResponseRedirect, JsonResponse
-from .models import ExtractSAP, Work_data, Project_history, communData, Type
-from .forms import UpdatedInfoForm, ShowDistinct
-from django.contrib.auth.decorators import login_required
-from itertools import cycle
+from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
 from django.contrib.auth.mixins import LoginRequiredMixin
-from .filters import Project_historyFilter, ExtractSAPFilter
 from django.utils.dateparse import parse_duration
 from django.apps import apps
 from django.db.models import ForeignKey
 
-
 from django_tables2 import SingleTableView
+
+from .filters import Project_historyFilter, ExtractSAPFilter
+from .models import ExtractSAP, Work_data, Project_history, communData, Type
+from .forms import UpdatedInfoForm, ShowDistinct
 from .tables import ExtractTable, WorkTable, CheckExtractTable, ExtractTableExpanded
+from .utils import has_group
 
 from PIL import Image
 import img2pdf
 
 import pandas as pd
-from django_pandas.io import read_frame
 
+from itertools import cycle
 import os.path
-from .utils import has_group
-from statistics import mean
 import pygal
 from datetime import date, timedelta
 import random
@@ -69,6 +64,8 @@ def Test (request):
     # Delete_record_from_csv()
     # from .check import check_database
     # check_database()
+    # from .PDFutils import RenamePDFFiles
+    # RenamePDFFiles()
 
     return redirect('Admin')
 
@@ -236,7 +233,7 @@ def Modify_drawing_status():
 
 def Modify_drawing_status_from_csv():
     import csv
-    with open('D:\\sapToBacklog.csv', 'r') as file:
+    with open('D:\\sapToRecheckLiasse.csv', 'r') as file:
         reader = csv.reader(file, delimiter='\t')
         SAP_log = logging.getLogger('StatusModification')
         SAP_log.setLevel(logging.INFO)
@@ -249,9 +246,10 @@ def Modify_drawing_status_from_csv():
         for row in reader:
             record = (int(row[0]))
             record_to_modify = Work_data.objects.get(id=record)
+            old_status = record_to_modify.status
             record_to_modify.status = 'TO_RE-CHECK'
             record_to_modify.id_rechecker = None
-            record_to_modify.comment = '[POSTRAIT SUMP]\n' + record_to_modify.comment
+            record_to_modify.comment = '[POSTRAIT TYP LIASSE]\n' + record_to_modify.comment
             recordSAP = ExtractSAP.objects.get(id=record_to_modify.id_SAP.pk)
             recordSAP.status = 'TO_RE-CHECK'
             record_to_modify.save()
@@ -259,7 +257,7 @@ def Modify_drawing_status_from_csv():
             print("status of Extract SAP id %d has been modified to BACKLOG" %record_to_modify.id_SAP.pk)
 
             SAP_log.info(
-                'Workdata id ' + str(record_to_modify.pk) + '(' + str(recordSAP.pk) + ')' + ' status changed to re-check')
+                'Workdata id ' + str(record_to_modify.pk) + '(' + str(recordSAP.pk) + ')' + ' status changed from '+ old_status +' to re-check')
         SAP_log.removeHandler(SAPHandler)
         SAPHandler.close()
 
@@ -472,7 +470,7 @@ def printNiceTimeDelta(value):
         return ""
 
 
-class ListBacklog(SingleTableView):
+class ListBacklog(LoginRequiredMixin,SingleTableView):
     model = Work_data
     context_object_name = "backlog"
     table_class = WorkTable
@@ -603,7 +601,7 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
             return table_data
 
 
-class ChangeDatabase(View):
+class ChangeDatabase(LoginRequiredMixin, View):
     template_name = 'trackdrawing/db_filter_view.html'
     table_class = ExtractTableExpanded
 
@@ -651,7 +649,7 @@ class ChangeDatabase(View):
         return render(request, self.template_name, {'filter': db_filter})
 
 
-class UpdatedInfoCreate(UpdateView):
+class UpdatedInfoCreate(LoginRequiredMixin, UpdateView):
     model = ExtractSAP
     template_name = "trackdrawing/UpdatedInfo.html"
     form_class = UpdatedInfoForm
@@ -667,7 +665,7 @@ class UpdatedInfoCreate(UpdateView):
 
         form.instance.user = self.request.user
         record = Work_data.objects.get(id_SAP__pk=form.instance.pk)
-        if form.instance.old_num:
+        if form.instance.old_num and not 'Ancien plan' in form.instance.remark:
             form.instance.remark = "Ancien plan: " + form.instance.old_num + "\n" + form.instance.remark
         data = form.cleaned_data
         if has_group(form.instance.user, 'Check') or record.status=='TO_RE-CHECK':
@@ -681,6 +679,7 @@ class UpdatedInfoCreate(UpdateView):
                     if record.status=='TO_RE-CHECK':
                         # log toute les modifs faites lors du re-check
                         if key == 'typ':
+                            # Modification du type
                             SAP_log.info(
                                 'ExtractSAP id ' + str(drawing.pk) + ' : champ ' + key + ' changed from ' + getattr(
                                     drawing, key).desc + ' to ' + Type.objects.get(id=data[key].pk).desc)
@@ -696,6 +695,31 @@ class UpdatedInfoCreate(UpdateView):
         if "backlog" in form.data:
             record.status = "BACKLOG"
             record.time_tracking = parse_duration(data["chronotime"])
+        if 'validateAll' in form.data:
+            SAP_log = logging.getLogger('StatusModification')
+            SAP_log.setLevel(logging.INFO)
+            SAPHandler = logging.FileHandler('StatusModification.log')
+            formatter = logging.Formatter('%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
+            SAPHandler.setFormatter(formatter)
+
+            SAP_log.addHandler(SAPHandler)
+
+            liasse_ref = Work_data.objects.get(id_SAP__pk=form.instance.pk).id_SAP.num_cadastre[:7]
+            record_to_dispatched = Work_data.objects.filter(id_SAP__num_cadastre__startswith=liasse_ref, status='TO_RE-CHECK').exclude(id_SAP__pk=form.instance.pk)
+            for rec in record_to_dispatched:
+                # oWork_data = Work_data.objects.get(id_SAP=rec.pk)
+                rec.status = 'CLOSED'
+                rec.save()
+                oExtractSAP = ExtractSAP.objects.get(id=rec.id_SAP.pk)
+                old_status = oExtractSAP.status
+                oExtractSAP.status = 'CLOSED'
+                oExtractSAP.save()
+                SAP_log.info(
+                    'Workdata id ' + str(rec.pk) + '(' + str(
+                        oExtractSAP.pk) + ')' + ' status changed from ' + old_status + ' to CLOSED')
+            SAP_log.removeHandler(SAPHandler)
+            SAPHandler.close()
+
         record.comment = form.data["backlog_comment"]
         record.save()
         form.instance.status = record.status
@@ -706,7 +730,7 @@ class UpdatedInfoCreate(UpdateView):
         return super(UpdatedInfoCreate, self).form_valid(form)
 
 
-class FilterDatabase(View):
+class FilterDatabase(LoginRequiredMixin, View):
     form_class = ShowDistinct
     template_name = 'trackdrawing/db_view.html'
     status = ['CLOSED',  'CHECKED', 'INVALID']

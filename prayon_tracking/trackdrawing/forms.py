@@ -549,7 +549,7 @@ class UpdatedInfoForm(forms.ModelForm):
             ),
         )
 
-        if self.instance.status in ['OPEN', 'CLOSED', 'BACKLOG', 'TO_RE-CHECK']:
+        if self.instance.status in ['OPEN', 'CLOSED', 'BACKLOG','CHECKED', 'INVALID', 'TO_RE-CHECK']:
             self.helper.layout.append(
                 Row(
                     Column(css_class="col col-md-1 mb-0", ),
@@ -578,22 +578,50 @@ class UpdatedInfoForm(forms.ModelForm):
                 ),
             )
 
-        if self.instance.status in ['CHECKED', 'INVALID']:
+        if self.instance.status in ['TO_RE-CHECK'] and self.Can_Valid_Liasse(record_liasse):
             self.helper.layout.append(
                 Row(
-                    Column(css_class="col col-md-1 mb-0", ),
+                    Column(css_class="col col-md-1 mb-0",),
                     Column(
-                        Row(
-                            HTML(
-                                '<a class="btn btn-success" href={% url "show_image" num_cadastre=form.instance.pk%} target="pdfview" id="id_view">View Drawing</a>'
-                            ),
-                            css_class="form-row",
-                        )
-                        , css_class="col col-md-10 mb-0",
+                        HTML('<br>'),
+                        HTML(
+                            '<button type="submit" class="btn btn-secondary" name="validateAll" style="width: 100%">'
+                            '<i class="fas fa-arrow-alt-circle-right"></i>Validate All Drawings'
+                            "</button>"
+                        ),
+                        css_class="col col-md-10 mb-0",
                     ),
                     Column(css_class="col col-md-1 mb-0", ),
                 ),
             )
+
+        # if self.instance.status in ['CHECKED', 'INVALID']:
+        #     self.helper.layout.append(
+        #         Row(
+        #             Column(css_class="col col-md-1 mb-0", ),
+        #             Column(
+        #                 Row(
+        #                     HTML(
+        #                         '<a class="btn btn-success" href={% url "show_image" num_cadastre=form.instance.pk%} target="pdfview" id="id_view">View Drawing</a>'
+        #                     ),
+        #                     css_class="form-row",
+        #                 )
+        #                 , css_class="col col-md-10 mb-0",
+        #             ),
+        #             Column(css_class="col col-md-1 mb-0", ),
+        #         ),
+        #     )
+
+
+    def Can_Valid_Liasse(self, records):
+        validate_All = True
+        for record in records:
+            comment = Work_data.objects.get(id_SAP__pk=record.pk).comment
+            status = Work_data.objects.get(id_SAP__pk=record.pk).status
+            if '[POSTRAIT TYP INVALID]' in comment and status == 'TO_RE-CHECK':
+                validate_All = False
+                break
+        return validate_All
 
 
     def choose_btn_class(self, field, comment):

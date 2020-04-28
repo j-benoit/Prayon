@@ -1,12 +1,30 @@
 import django_tables2 as tables
 from django_tables2 import A
 from .models import ExtractSAP, Work_data
-
+from django.utils.safestring import mark_safe
+from django.utils.html import format_html
 
 class ExtractTable(tables.Table):
+    # Used on Home View
+    title = tables.Column()
     num_cadastre = tables.LinkColumn('edit_data', args=[A('pk')])
+    typ = tables.Column(verbose_name="Type")
+    # comment = tables.Column(verbose_name="Commentaires", empty_values=())
+    comment = tables.TemplateColumn('{{ record.text_field|linebreaksbr }}', verbose_name="Commentaires", empty_values=())
+
+    def render_comment(self, record):
+        commentaire = Work_data.objects.get(id_SAP__pk=record.pk).comment
+        commentaire = commentaire.replace('\n', '<br>')
+        commentaire = commentaire.replace(
+            '[POSTRAIT TYP INVALID]',
+            '<SPAN class="error_type">[POSTRAIT TYP INVALID]</SPAN>')
+        commentaire = commentaire.replace(
+            '[POSTRAIT TYP LIASSE]',
+            '<SPAN class="error_liasse">[POSTRAIT TYP LIASSE]</SPAN>')
+        return mark_safe(commentaire.replace('\n', '<br>'))
+
     class Meta:
-        model = ExtractSAP
+        # model = ExtractSAP
         template_name = 'trackdrawing/TableRender.html'
         attrs = {"class": "table-striped table-bordered table-sm",
                  'tbody': {'id': 'ExtractTable'},
@@ -16,6 +34,7 @@ class ExtractTable(tables.Table):
 
 
 class ExtractTableExpanded(tables.Table):
+    # Used on View DB
     id_SAP__num_cadastre = tables.LinkColumn('show_image', args=[A('id_SAP.pk')], attrs={"a": {"target": "pdfview"}}, verbose_name='View drawing')
 
     class Meta:
@@ -29,6 +48,7 @@ class ExtractTableExpanded(tables.Table):
 
 
 class WorkTable(tables.Table):
+    # Used for Backlog View
     id_SAP__num_cadastre = tables.LinkColumn('edit_data', args=[A('id_SAP__pk')])
     class Meta:
         model = Work_data
@@ -42,6 +62,7 @@ class WorkTable(tables.Table):
 
 
 class CheckExtractTable(tables.Table):
+    # Used On Filter view
     num_cadastre = tables.LinkColumn('edit_data', args=[A('pk')])
     title =tables.Column(
         attrs={'td': {'class': 'record_title', 'data-pk': lambda record: record.id, 'data-name': 'title', 'data-type':'textarea'}})
@@ -58,7 +79,14 @@ class CheckExtractTable(tables.Table):
         fields = ("title", "num_cadastre")
 
 class LiasseTable(tables.Table):
+    # Used on Modify SAP View
+    Work_id = tables.Column(verbose_name='Id', empty_values=())
+    title = tables.Column()
     num_cadastre = tables.LinkColumn('show_image', args=[A('pk')], attrs={"a": {"target": "pdfview"}}, verbose_name='View drawing')
+    typ = tables.Column(verbose_name="Type")
+    comment = tables.TemplateColumn('{{ record.text_field|linebreaksbr }}', verbose_name="Commentaires", empty_values=())
+    status = tables.Column(verbose_name='Status', empty_values=())
+
     class Meta:
         model = ExtractSAP
         template_name = 'trackdrawing/TableRender.html'
@@ -66,4 +94,22 @@ class LiasseTable(tables.Table):
                  'tbody': {'id': 'ExtractTable'},
                  'search_form': {'id': 'ExtractTable_search_form_id'},
                  }
-        fields = ("title", "num_cadastre", 'typ')
+        fields = ('Work_id', "title", "num_cadastre", 'typ')
+
+    def render_comment(self, record):
+        commentaire = Work_data.objects.get(id_SAP__pk=record.pk).comment
+        commentaire = commentaire.replace('\n', '<br>')
+        commentaire = commentaire.replace(
+            '[POSTRAIT TYP INVALID]',
+            '<SPAN class="error_type">[POSTRAIT TYP INVALID]</SPAN>')
+        commentaire = commentaire.replace(
+            '[POSTRAIT TYP LIASSE]',
+            '<SPAN class="error_liasse">[POSTRAIT TYP LIASSE]</SPAN>')
+        return mark_safe(commentaire.replace('\n', '<br>'))
+
+    def render_status(self, record):
+        return Work_data.objects.get(id_SAP__pk=record.pk).status
+
+    def render_Work_id(self, record):
+        return Work_data.objects.get(id_SAP__pk=record.pk).pk
+
