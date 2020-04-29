@@ -1,12 +1,11 @@
-{% extends 'trackdrawing/PageTemplate.html' %}
+{% extends 'trackdrawing/db_mass_mod.html' %}
 {% load crispy_forms_tags %}
 {% load render_table from django_tables2 %}
 
 {% load extras %}
 
-{% block mainframe %}
+{% block MassModView %}
     {% crispy filter.form filter.helper %}
-
     {% if table %}
         Query has returned {{table.rows|length}} records:
         <form action="" method="post">

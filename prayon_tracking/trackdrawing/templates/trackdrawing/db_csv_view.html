@@ -1,0 +1,17 @@
+{% extends 'trackdrawing/db_mass_mod.html' %}
+{% load crispy_forms_tags %}
+{% load render_table from django_tables2 %}
+
+{% load extras %}
+
+{% block MassModView %}
+    <form method="post" enctype="multipart/form-data">
+        {% crispy form %}
+        <input type="submit" name="loadCSV" value="LoadCSV" class="btn btn-primary" id="submit-id-submit"/>
+    </form>
+    {% if table %}
+        Query has returned {{table.rows|length}} records:
+        {% render_table table %}
+    {% endif %}
+
+{% endblock %}

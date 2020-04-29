@@ -15,6 +15,36 @@ from .tables import LiasseTable
 from .utils import has_group
 
 
+class UploadFileForm(forms.Form):
+    file = forms.FileField(required=True)
+    comment = forms.CharField(required=True)
+
+    def __init__(self, *args, **kwargs):
+        super(UploadFileForm, self).__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.form_show_labels = True
+        self.fields["comment"].validators = [
+                    RegexValidator(r'^\[.*\]$', message="Le commentaire doit commencer par '[' et terminer par ']'")] # r'\A\['
+        self.helper.layout = Layout(
+            Row(
+                Column(
+                    Field(
+                        "file",
+                        template="trackdrawing/custom_field_file.html",
+                    ),
+                    css_class="form-label col-3 mb-0",
+                ),
+                Column(
+                    Field(
+                        "comment",
+                    ),
+                    css_class="form-label col-12 mb-0",
+                ),
+                css_class="form-label",
+            ),
+        )
+
 class ShowDistinct(forms.ModelForm):
     FIELD_CHOICE = [
         ('author', 'Author'),

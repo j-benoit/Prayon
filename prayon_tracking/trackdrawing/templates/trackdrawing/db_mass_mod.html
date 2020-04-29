@@ -1,0 +1,20 @@
+{% extends 'trackdrawing/PageTemplate.html' %}
+
+{% block mainframe %}
+    <div class="container mw-100 border">
+        <div class="row border">
+            <div class="col-1 border">
+                <div class="row border">
+                    <a href="{% url 'Filterdb' %}">Modify with Filter</a>
+                </div>
+                <div class="row border">
+                    <a href="{% url 'CSVdb' %}">Modify with CSV</a>
+                </div>
+            </div>
+            <div class="col-10 border">
+                {% block MassModView %}
+                {% endblock %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

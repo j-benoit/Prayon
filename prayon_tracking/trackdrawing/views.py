@@ -1,3 +1,4 @@
+from django.core.cache import cache
 from django.shortcuts import render
 from django.db.models import Count, Q
 from django.views.generic import UpdateView
@@ -16,7 +17,7 @@ from django_tables2 import SingleTableView
 
 from .filters import Project_historyFilter, ExtractSAPFilter
 from .models import ExtractSAP, Work_data, Project_history, communData, Type
-from .forms import UpdatedInfoForm, ShowDistinct
+from .forms import UpdatedInfoForm, ShowDistinct, UploadFileForm
 from .tables import ExtractTable, WorkTable, CheckExtractTable, ExtractTableExpanded
 from .utils import has_group
 
@@ -475,6 +476,21 @@ def printNiceTimeDelta(value):
         return ""
 
 
+# class upload_file(View):
+#     template_name = 'trackdrawing/db_filter_view.html'
+#     form_class = 'UploadFileForm'
+#
+#     def post(self, request, *args, **kwargs):
+#         form = self.form_class(request.POST, request.FILES)
+#         if form.is_valid():
+#             handle_uploaded_file(request.FILES['file'])
+#             return HttpResponseRedirect('/success/url/')
+#
+#     def get(self, request, *args, **kwargs):
+#         form = self.form_class()
+#         return render(request, self.template_name, {'form': form})
+
+
 class ListBacklog(LoginRequiredMixin,SingleTableView):
     model = Work_data
     context_object_name = "backlog"
@@ -603,16 +619,16 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
             return table_data
 
 
-class ChangeDatabase(LoginRequiredMixin, View):
+class FilterModDatabase(LoginRequiredMixin, View):
     template_name = 'trackdrawing/db_filter_view.html'
     table_class = ExtractTableExpanded
 
     def get(self, request, *args, **kwargs):
-        db_filter = ExtractSAPFilter(request.GET, queryset=Work_data.objects.filter(status__in=[
-                            'CLOSED',
-                            'CHECKED',
-                            'INVALID',
-                        ]))
+        db_filter = ExtractSAPFilter(request.GET,queryset=Work_data.objects.filter(status__in=[
+                'CLOSED',
+                'CHECKED',
+                'INVALID',
+            ]))
         if 'typ' in request.GET: # and request.GET['typ']:
             table = ExtractTableExpanded(db_filter.qs)
             return render(request, self.template_name, {'filter': db_filter, 'table': table})
@@ -621,17 +637,17 @@ class ChangeDatabase(LoginRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         db_filter = ExtractSAPFilter(request.GET, queryset=Work_data.objects.filter(status__in=[
-                            'CLOSED',
-                            'CHECKED',
-                            'INVALID',
-                        ]))
+            'CLOSED',
+            'CHECKED',
+            'INVALID',
+        ]))
+
         new_status = 'TO_RE-CHECK'
         SAP_log = logging.getLogger('StatusModification')
         SAP_log.setLevel(logging.INFO)
         SAPHandler = logging.FileHandler('StatusModification.log')
         formatter = logging.Formatter('%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
         SAPHandler.setFormatter(formatter)
-
         SAP_log.addHandler(SAPHandler)
 
         for record in db_filter.qs:
@@ -647,8 +663,56 @@ class ChangeDatabase(LoginRequiredMixin, View):
 
         SAP_log.removeHandler(SAPHandler)
         SAPHandler.close()
+        table = ExtractTableExpanded(db_filter.qs)
 
-        return render(request, self.template_name, {'filter': db_filter})
+        return render(request, self.template_name, {'filter': db_filter,'table': table})
+
+
+class CsvModDatabase(LoginRequiredMixin, View):
+    template_name = 'trackdrawing/db_csv_view.html'
+    table_class = ExtractTableExpanded
+    form_class = UploadFileForm
+
+    def get(self, request, *args, **kwargs):
+        form = self.form_class()
+        return render(request, self.template_name, {'form': form})
+
+    def post(self, request, *args, **kwargs):
+        form = self.form_class(request.POST, request.FILES)
+        if form.is_valid():
+            import csv
+            csv_file = request.FILES["file"]
+            file_data = csv_file.read().decode("utf-8")
+            lines = file_data.split("\r\n")
+            reduced_list = []
+            for line in lines:
+                reduced_list.append(Work_data.objects.get(id=line))
+            table = ExtractTableExpanded(reduced_list)
+
+            new_status = 'TO_RE-CHECK'
+            SAP_log = logging.getLogger('StatusModification')
+            SAP_log.setLevel(logging.INFO)
+            SAPHandler = logging.FileHandler('StatusModification.log')
+            formatter = logging.Formatter('%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
+            SAPHandler.setFormatter(formatter)
+            SAP_log.addHandler(SAPHandler)
+
+            for record in reduced_list:
+                # Modify work_data status & save
+                record.comment = request.POST['comment'] + '\n' + record.comment
+                record.id_rechecker = None
+                record.status = new_status
+                record.save()
+                # Modify Extract SAP status & save
+                SAP_record = ExtractSAP.objects.get(id=record.id_SAP.pk)
+                SAP_record.status = new_status
+                SAP_record.save()
+                SAP_log.info('Workdata id ' + str(record.pk) + '(' + str(SAP_record.pk) + ')' + ' status changed to re-check')
+
+            SAP_log.removeHandler(SAPHandler)
+            SAPHandler.close()
+
+            return render(request, self.template_name, {'form': form,'table': table})
 
 
 class UpdatedInfoCreate(LoginRequiredMixin, UpdateView):
@@ -689,7 +753,7 @@ class UpdatedInfoCreate(LoginRequiredMixin, UpdateView):
                             SAP_log.info('ExtractSAP id ' + str(drawing.pk) + ' : champ ' + key + ' changed from ' + getattr(drawing, key) +' to '+ data[key])
                     # break
             record.status = status
-            record.id_checker = form.instance.user
+            # record.id_checker = form.instance.user
             record.check_time_tracking = parse_duration(data["chronotime"]) - record.time_tracking
         else:
             record.status = "CLOSED"
