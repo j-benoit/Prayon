@@ -25,6 +25,7 @@
                             <th>{{field}}</th>
                         {% endfor %}
                         <th>Select</th>
+                        <th>First Drawing ID</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -34,6 +35,11 @@
                                 <td> {{value}}</td>
                             {% endfor %}
                             <td><input type="checkbox" id="selectquery" name="queryselection" value="{{element|dict_first}}"></td>
+                            {% with field=element|get_first_key_name %}
+                                {% with name=element|get_key:field %}
+                                    <td><a target="pdfview" href="{% url 'show_image' First_ID|get_key:name %}">{{First_ID|get_key:name}}</td>
+                                {% endwith %}
+                            {% endwith %}
                         </tr>
                     {% endfor %}
                 </tbody>

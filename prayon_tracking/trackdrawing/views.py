@@ -814,6 +814,7 @@ class FilterDatabase(LoginRequiredMixin, View):
                 search_field = request.POST['field_choice'] +'__contains'
                 records = ExtractSAP.objects.filter(**{'status__in': self.status,
                                                        search_field: request.POST['contains']}).values(request.POST['field_choice']).annotate(count=Count(request.POST['field_choice'])).order_by(request.POST['field_choice'])
+                First_ID = {record[request.POST['field_choice']]: ExtractSAP.objects.filter(**{request.POST['field_choice']:record[request.POST['field_choice']]}).values('id')[0]['id'] for record in records}
             else:
                 records = ExtractSAP.objects.filter(status__in=self.status).values(request.POST['field_choice']).annotate(count=Count(request.POST['field_choice'])).order_by(request.POST['field_choice'])
             if request.POST['field_choice']=='title':
@@ -824,7 +825,7 @@ class FilterDatabase(LoginRequiredMixin, View):
                 return render(request, self.template_name, {'form': form1, 'records': records, 'table': table})
 
             # print(records)
-            return render(request, self.template_name, {'form': form1, 'records': records})
+            return render(request, self.template_name, {'form': form1, 'records': records, 'First_ID': First_ID})
 
         if "Modify" in request.POST:
             # print(request.POST)
