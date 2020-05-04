@@ -1,4 +1,3 @@
-from django.core.cache import cache
 from django.shortcuts import render
 from django.db.models import Count, Q
 from django.views.generic import UpdateView
@@ -19,7 +18,7 @@ from .filters import Project_historyFilter, ExtractSAPFilter
 from .models import ExtractSAP, Work_data, Project_history, communData, Type
 from .forms import UpdatedInfoForm, ShowDistinct, UploadFileForm
 from .tables import ExtractTable, WorkTable, CheckExtractTable, ExtractTableExpanded
-from .utils import has_group
+from .utils import has_group, remove_duplicate
 
 from PIL import Image
 import img2pdf
@@ -61,12 +60,19 @@ def Dispatch_Work (request):
 
 def Test (request):
     # Modify_drawing_status()
-    Modify_drawing_status_from_csv()
+    # Modify_drawing_status_from_csv()
     # Delete_record_from_csv()
     # from .check import check_database
     # check_database()
     # from .PDFutils import RenamePDFFiles
     # RenamePDFFiles()
+
+    # owork_data = Work_data.objects.filter(comment__contains='[POSTRAIT POMPE]')
+    # for record in owork_data:
+    #     print(record.comment)
+    #     print(remove_duplicate(record.comment))
+    #     record.comment = remove_duplicate(record.comment)
+    #     record.save()
 
     return redirect('Admin')
 
@@ -159,6 +165,7 @@ def Export_Database(request):
         'id SAP',
         'id user',
         'id checker',
+        'id rechecker',
         'created date',
         'modified date',
         'comment',
@@ -234,7 +241,7 @@ def Modify_drawing_status():
 
 def Modify_drawing_status_from_csv():
     import csv
-    with open('D:\\sapToRecheckLiasse.csv', 'r') as file:
+    with open('D:\\sapToRecheckLiasse2.csv', 'r') as file:
         reader = csv.reader(file, delimiter='\t')
         SAP_log = logging.getLogger('StatusModification')
         SAP_log.setLevel(logging.INFO)
@@ -255,7 +262,7 @@ def Modify_drawing_status_from_csv():
             recordSAP.status = 'TO_RE-CHECK'
             record_to_modify.save()
             recordSAP.save()
-            print("status of Extract SAP id %d has been modified to BACKLOG" %record_to_modify.id_SAP.pk)
+            print('Workdata id ' + str(record_to_modify.pk) + '(' + str(recordSAP.pk) + ')' + ' status changed from '+ old_status +' to re-check')
 
             SAP_log.info(
                 'Workdata id ' + str(record_to_modify.pk) + '(' + str(recordSAP.pk) + ')' + ' status changed from '+ old_status +' to re-check')
@@ -476,21 +483,6 @@ def printNiceTimeDelta(value):
         return ""
 
 
-# class upload_file(View):
-#     template_name = 'trackdrawing/db_filter_view.html'
-#     form_class = 'UploadFileForm'
-#
-#     def post(self, request, *args, **kwargs):
-#         form = self.form_class(request.POST, request.FILES)
-#         if form.is_valid():
-#             handle_uploaded_file(request.FILES['file'])
-#             return HttpResponseRedirect('/success/url/')
-#
-#     def get(self, request, *args, **kwargs):
-#         form = self.form_class()
-#         return render(request, self.template_name, {'form': form})
-
-
 class ListBacklog(LoginRequiredMixin,SingleTableView):
     model = Work_data
     context_object_name = "backlog"
@@ -565,7 +557,7 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
                         tmp_table_data.append(ExtractSAP.objects.get(id=checked_record.id_SAP.pk))
 
                 return tmp_table_data
-        else:
+        elif not (has_group(self.request.user,'postrait_gp')):
             # L'utilisateur connecté ne fait pas partie du groupe checker
             # On récupère sa liste de plan au status OPEN
             user_drawing_list = [record.id_SAP.pk for record in Work_data.objects.filter(id_user__pk=self.request.user.id, status__in=['OPEN'])]
@@ -617,6 +609,9 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
                     return record_to_dispatched
 
             return table_data
+        else:
+            # Si rien de tout ca, on renvoie une liste vide
+            return []
 
 
 class FilterModDatabase(LoginRequiredMixin, View):
@@ -653,6 +648,7 @@ class FilterModDatabase(LoginRequiredMixin, View):
         for record in db_filter.qs:
             # Modify work_data status & save
             record.comment = request.POST['comment'] + '\n' + record.comment
+            record.id_rechecker = None
             record.status = new_status
             record.save()
             # Modify Extract SAP status & save
@@ -750,8 +746,11 @@ class UpdatedInfoCreate(LoginRequiredMixin, UpdateView):
                                 'ExtractSAP id ' + str(drawing.pk) + ' : champ ' + key + ' changed from ' + getattr(
                                     drawing, key).desc + ' to ' + Type.objects.get(id=data[key].pk).desc)
                         else:
-                            SAP_log.info('ExtractSAP id ' + str(drawing.pk) + ' : champ ' + key + ' changed from ' + getattr(drawing, key) +' to '+ data[key])
-                    # break
+                            try:
+                                SAP_log.info('ExtractSAP id ' + str(drawing.pk) + ' : champ ' + key + ' changed from ' + getattr(drawing, key) +' to '+ data[key])
+                            except:
+                                SAP_log.info('ExtractSAP id ' + str(drawing.pk) + ' key error ' + key)
+                                # break
             record.status = status
             # record.id_checker = form.instance.user
             record.check_time_tracking = parse_duration(data["chronotime"]) - record.time_tracking
@@ -817,6 +816,7 @@ class FilterDatabase(LoginRequiredMixin, View):
                 First_ID = {record[request.POST['field_choice']]: ExtractSAP.objects.filter(**{request.POST['field_choice']:record[request.POST['field_choice']]}).values('id')[0]['id'] for record in records}
             else:
                 records = ExtractSAP.objects.filter(status__in=self.status).values(request.POST['field_choice']).annotate(count=Count(request.POST['field_choice'])).order_by(request.POST['field_choice'])
+                First_ID = {record[request.POST['field_choice']]: ExtractSAP.objects.filter(**{request.POST['field_choice']:record[request.POST['field_choice']]}).values('id')[0]['id'] for record in records}
             if request.POST['field_choice']=='title':
                 search_field = request.POST['field_choice'] + '__contains'
                 records = ExtractSAP.objects.filter(**{'status__in': self.status,

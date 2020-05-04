@@ -44,3 +44,8 @@ def average_times_of_day(x):
     angles = [datetime_to_radians(y) for y in x]
     avg_angle = average_angle(angles)
     return radians_to_time_of_day(avg_angle)
+
+
+def remove_duplicate(string, separator='\n'):
+    string_lines = set(string.split(separator))
+    return separator.join(string_lines)

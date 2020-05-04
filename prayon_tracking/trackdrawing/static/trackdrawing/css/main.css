@@ -7,6 +7,7 @@
 .ESPACE_UNITES { background-color:#ccffcc; }
 .error_type { background-color:#fcb400; }
 .error_liasse { background-color:#c7fc00; }
+.error_pompe { background-color:#1ecaf9; }
 
 
 /* Make inline editables take the full width of their parents */

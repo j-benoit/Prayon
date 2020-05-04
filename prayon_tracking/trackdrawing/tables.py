@@ -15,8 +15,7 @@ def f_render_comment(commentaire):
         '<SPAN class="error_liasse">[POSTRAIT TYP LIASSE]</SPAN>')
     commentaire = commentaire.replace(
         '[POSTRAIT POMPE]',
-        '<SPAN class="error_pompe">[POSTRAIT TYP LIASSE]</SPAN>')
-
+        '<SPAN class="error_pompe">[POSTRAIT POMPE]</SPAN>')
     return commentaire
 
 

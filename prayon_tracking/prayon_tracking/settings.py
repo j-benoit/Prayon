@@ -25,7 +25,7 @@ SECRET_KEY = 'as(=y3qv-2d^(=&zw5k1w3lt-b)wk--xj+97($z8^)7$@30e34'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['0.0.0.0', '127.0.0.1', '10.71.2.103', '192.168.0.23', '91.174.168.129']
+ALLOWED_HOSTS = ['0.0.0.0', '127.0.0.1', '10.71.2.103', '10.79.61.26']
 
 
 # Application definition
@@ -85,12 +85,6 @@ DATABASES = {
     }
 }
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'trackdrawing'
-    }
-}
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
@@ -130,7 +124,7 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
-MEDIA_ROOT = 'F:/Documents/Workspace/Prayon/prayon_tracking/media/'
+MEDIA_ROOT = 'D:/PRAYON/PDF'
 STATIC_ROOT = os.path.join(BASE_DIR, '/static/')
 
 STATICFILES_DIRS = (

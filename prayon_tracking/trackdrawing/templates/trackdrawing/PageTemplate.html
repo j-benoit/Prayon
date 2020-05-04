@@ -42,15 +42,17 @@
                             <a class="nav-link" data-toggle="menu" href="{% url "Backlog" %}">Backlog</a>
                         </li>
                     {% endif %}
-                    {% if user|has_group:'CP' %}
-                        <li class="nav-item">
-                            <a class="nav-link" data-toggle="menu" href="{% url "Admin" %}">Admin</a>
-                        </li>
+                    {% if user|has_group:'CP' or user|has_group:'postrait_gp' %}
                         <li class="nav-item">
                             <a class="nav-link" data-toggle="menu" href="{% url "viewdb" %}">View DB</a>
                         </li>
-                        <li class="nav-item">
+                    {% endif %}
+                    {% if user|has_group:'CP' %}
+                         <li class="nav-item">
                             <a class="nav-link" data-toggle="menu" href="{% url "Filterdb" %}">Filter DB</a>
+                        </li>
+                       <li class="nav-item">
+                            <a class="nav-link" data-toggle="menu" href="{% url "Admin" %}">Admin</a>
                         </li>
                     {% endif %}
                 </ul>
