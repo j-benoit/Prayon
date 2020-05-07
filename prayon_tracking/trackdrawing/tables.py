@@ -2,7 +2,9 @@ import django_tables2 as tables
 from django_tables2 import A
 from .models import ExtractSAP, Work_data
 from django.utils.safestring import mark_safe
+from django.core.files.storage import FileSystemStorage
 from django.utils.html import format_html
+import os
 
 
 def f_render_comment(commentaire):
@@ -39,6 +41,36 @@ class ExtractTable(tables.Table):
                  'search_form': {'id': 'ExtractTable_search_form_id'},
                  }
         fields = ("title", "num_cadastre",)
+
+
+class StampingTable(tables.Table):
+    # Used on Home View
+    title = tables.Column()
+    num_cadastre = tables.LinkColumn('edit_data', args=[A('pk')])
+    # Download = tables.TemplateColumn('<a class="btn btn-success" href={% url "DownloadDrawing" record.id%}>Download File</a>', verbose_name="Download", empty_values=())
+    Download = tables.TemplateColumn('{{ record.html }}',
+        verbose_name="Download", empty_values=())
+    # comment = tables.Column(verbose_name="Commentaires", empty_values=())
+    Upload = tables.TemplateColumn('<a class="btn btn-success" href={% url "UploadDrawing" record.id%}>Upload File</a>', verbose_name="Upload", empty_values=())
+
+    class Meta:
+        # model = ExtractSAP
+        template_name = 'trackdrawing/TableRender.html'
+        attrs = {"class": "table-striped table-bordered table-sm",
+                 'tbody': {'id': 'StampingTable'},
+                 'search_form': {'id': 'StampingTable_search_form_id'},
+                 }
+        fields = ("title", "num_cadastre",)
+
+    def render_Download(self, record):
+        fs = FileSystemStorage()
+        obj = ExtractSAP.objects.get(pk=record.id)
+        filename = obj.num_cadastre + ".pdf"
+        if fs.exists(os.path.join(os.path.join(fs.location, 'TMP'), filename)):
+            html_txt = '<a class="btn btn-danger" href=/prayon/Stamp/Download/' + str(record.id) + '>Download File</a>'
+        else:
+            html_txt = '<a class="btn btn-success" href=/prayon/Stamp/Download/' + str(record.id) + '>Download File</a>'
+        return mark_safe(html_txt)
 
 
 class ExtractTableExpanded(tables.Table):

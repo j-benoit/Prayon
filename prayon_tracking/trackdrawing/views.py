@@ -6,7 +6,7 @@ from django.contrib.auth.models import User, Group
 from django.core.files.storage import FileSystemStorage
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
-from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
+from django.http import HttpResponse, HttpResponseNotFound, JsonResponse, FileResponse
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.dateparse import parse_duration
 from django.apps import apps
@@ -16,9 +16,10 @@ from django_tables2 import SingleTableView
 
 from .filters import Project_historyFilter, ExtractSAPFilter
 from .models import ExtractSAP, Work_data, Project_history, communData, Type
-from .forms import UpdatedInfoForm, ShowDistinct, UploadFileForm
-from .tables import ExtractTable, WorkTable, CheckExtractTable, ExtractTableExpanded
+from .forms import UpdatedInfoForm, ShowDistinct, UploadFileForm, StampedDocumentForm
+from .tables import ExtractTable, WorkTable, CheckExtractTable, ExtractTableExpanded, StampingTable
 from .utils import has_group, remove_duplicate
+from .utility import *
 
 from PIL import Image
 import img2pdf
@@ -73,6 +74,7 @@ def Test (request):
     #     print(remove_duplicate(record.comment))
     #     record.comment = remove_duplicate(record.comment)
     #     record.save()
+    # Modify_Multipages_drawing_from_csv()
 
     return redirect('Admin')
 
@@ -193,98 +195,6 @@ def Export_Database(request):
     response = HttpResponse(excel_file.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = 'attachment; filename="Export_SAP.xlsx"'
     return response
-
-
-def Delete_Duplicate_Records(request):
-    duplicates = ExtractSAP.objects.values(
-        'num_cadastre'
-    ).annotate(name_count=Count('num_cadastre')).filter(name_count__gt=1)
-    records = ExtractSAP.objects.filter(num_cadastre__in=[item['num_cadastre'] for item in duplicates])
-    print(set([item.num_cadastre for item in records]))
-    for num_cadastre in set([item.num_cadastre for item in records]):
-        record = ExtractSAP.objects.filter(num_cadastre=num_cadastre)
-        for record_to_delete in record[1:]:
-            record_to_delete.delete()
-
-            print(str(record_to_delete.pk) + "[DUPLICATE] this record is duplicated with " + str(record[0].pk))
-
-    return redirect('Admin')
-
-
-def Send_Missing_Drawing_to_Backlog(request):
-    fs = FileSystemStorage()
-    listOfFiles = [f[:15] for f in os.listdir('Y:\\') if os.path.isfile('Y:\\' + f)]
-    extract_without_draw = [record.pk for record in ExtractSAP.objects.all() if record.num_cadastre not in listOfFiles]
-    for pk in extract_without_draw:
-        recordSAP = ExtractSAP.objects.get(id=pk)
-        recordSAP.file_exists ='N/A'
-        recordSAP.save()
-        record, created = Work_data.objects.get_or_create(id_SAP=recordSAP, id_user=request.user)
-        if created:
-            record.id_SAP = recordSAP
-        record.id_user = request.user
-        record.status = 'BACKLOG'
-        record.comment = '[ERROR] No drawing for this record'
-        record.save()
-    return redirect('Admin')
-
-
-def Modify_drawing_status():
-    record_to_modify = Work_data.objects.filter(status='CLOSED', id_SAP__typ__isnull=True)
-    for record in record_to_modify:
-        record.status = 'BACKLOG'
-        recordSAP = ExtractSAP.objects.get(id=record.id_SAP.pk)
-        recordSAP.status = 'BACKLOG'
-        # record.save()
-        # recordSAP.save()
-        print("status of Extract SAP id %d has been modified to BACKLOG" %record.id_SAP.pk)
-
-def Modify_drawing_status_from_csv():
-    import csv
-    with open('D:\\sapToRecheckLiasse2.csv', 'r') as file:
-        reader = csv.reader(file, delimiter='\t')
-        SAP_log = logging.getLogger('StatusModification')
-        SAP_log.setLevel(logging.INFO)
-        SAPHandler = logging.FileHandler('StatusModification.log')
-        formatter = logging.Formatter('%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
-        SAPHandler.setFormatter(formatter)
-
-        SAP_log.addHandler(SAPHandler)
-
-        for row in reader:
-            record = (int(row[0]))
-            record_to_modify = Work_data.objects.get(id=record)
-            old_status = record_to_modify.status
-            record_to_modify.status = 'TO_RE-CHECK'
-            record_to_modify.id_rechecker = None
-            record_to_modify.comment = '[POSTRAIT TYP LIASSE]\n' + record_to_modify.comment
-            recordSAP = ExtractSAP.objects.get(id=record_to_modify.id_SAP.pk)
-            recordSAP.status = 'TO_RE-CHECK'
-            record_to_modify.save()
-            recordSAP.save()
-            print('Workdata id ' + str(record_to_modify.pk) + '(' + str(recordSAP.pk) + ')' + ' status changed from '+ old_status +' to re-check')
-
-            SAP_log.info(
-                'Workdata id ' + str(record_to_modify.pk) + '(' + str(recordSAP.pk) + ')' + ' status changed from '+ old_status +' to re-check')
-        SAP_log.removeHandler(SAPHandler)
-        SAPHandler.close()
-
-
-def Delete_record_from_csv():
-    import csv
-    with open('D:\\sapToOpen2.csv', 'r') as file:
-        reader = csv.reader(file, delimiter='\t')
-        for row in reader:
-            record = (int(row[0]))
-            record_to_suppress = Work_data.objects.get(id=record)
-            recordSAP = ExtractSAP.objects.get(id=record_to_suppress.id_SAP.pk)
-            recordSAP.status = ''
-            record_to_suppress.delete()
-            # record.save()
-            recordSAP.save()
-            print("status of Extract SAP id %d has been modified to OPEN" %record_to_suppress.id_SAP.pk)
-    record = Work_data.objects.get(id=53)
-    record.save()
 
 
 def Admin(request):
@@ -493,6 +403,22 @@ class ListBacklog(LoginRequiredMixin,SingleTableView):
 
     def get_table_data(self):
         table_data = Work_data.objects.filter(Q(id_checker__pk=self.request.user.id) | Q(id_user__pk=self.request.user.id) | Q(id_rechecker__pk=self.request.user.id)).exclude(status='OPEN')
+        return table_data
+
+
+
+class StampView(LoginRequiredMixin, SingleTableView):
+    model = ExtractSAP
+    table_class = StampingTable
+    template_name = "trackdrawing/Stamp_drawings.html"
+    paginate_by = 10
+
+    def get_table_data(self):
+        table_data = ExtractSAP.objects.filter(status__in=[
+            'CLOSED',
+            'CHECKED',
+            'INVALID',
+        ]).exclude(stamped_document__isnull=False).order_by('id')
         return table_data
 
 
@@ -867,6 +793,44 @@ class FilterDatabase(LoginRequiredMixin, View):
             return render(request, self.template_name, {'form': form1})
 
         # return render(request, self.template_name, {'form': form1})
+
+
+def UploadDrawing(request, num_cadastre):
+    instance = ExtractSAP.objects.get(pk=num_cadastre)
+    filename = instance.num_cadastre + ".pdf"
+    if request.method == 'POST':
+        form = StampedDocumentForm(request.POST, request.FILES)
+        if form.is_valid():
+            instance.stamped_document = request.FILES['stamped_document']
+            instance.save()
+            # Suppress temporary file from TMP folder
+            fs = FileSystemStorage()
+            os.remove(os.path.join(os.path.join(fs.location, 'TMP'), filename))
+            return redirect('StampView')
+    else:
+        form = StampedDocumentForm(instance=instance)
+    return render(request, 'trackdrawing/model_form_upload.html', {
+        'form': form
+    })
+
+def DownloadDrawing(request, num_cadastre):
+    from .PDFutils import pdf_add_metadata
+    fs = FileSystemStorage()
+    record = ExtractSAP.objects.get(pk=num_cadastre)
+    filename = record.num_cadastre + ".pdf"
+    if fs.exists(os.path.join(os.path.join(fs.location, 'TMP'), filename)):
+        return HttpResponseNotFound('The File is already in use')
+    else:
+        pdf_add_metadata(fs.location, filename, 'NumeroCadastre', record.num_cadastre, filename, os.path.join(fs.location, 'TMP'))
+        file_to_open = os.path.join(os.path.join(fs.location, 'TMP'), filename)
+        if fs.exists(filename):
+            with fs.open(file_to_open) as pdf:
+                # Add metadata to the downloaded file
+                response = HttpResponse(pdf.read(), content_type='application/pdf')
+                response['Content-Disposition'] = 'attachment; filename=' + filename
+                return response
+        else:
+            return HttpResponseNotFound('The requested pdf was not found in our server.')
 
 
 def DisplayDrawing(request, num_cadastre):

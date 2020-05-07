@@ -37,6 +37,9 @@ urlpatterns = [
     url(r'^ModDB', views.FilterDatabase.as_view(), name='viewdb'),
     url(r'^ViewDB/Filter', views.FilterModDatabase.as_view(), name='Filterdb'),
     url(r'^ViewDB/CSV', views.CsvModDatabase.as_view(), name='CSVdb'),
+    url(r'^Stamp$', views.StampView.as_view(), name='StampView'),
+    url(r'^Stamp/Download/(?P<num_cadastre>\d+)$', views.DownloadDrawing, name='DownloadDrawing'),
+    url(r'^Stamp/Upload/(?P<num_cadastre>\d+)$', views.UploadDrawing, name='UploadDrawing'),
     # url(r'^GroupUser', views.GroupUser, name='GroupUser'),
     url(r'^UpdateData$', views.UpdatedInfoCreate.as_view(), name='update_data'),
 

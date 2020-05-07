@@ -15,6 +15,31 @@ from .tables import LiasseTable
 from .utils import has_group
 
 
+class StampedDocumentForm(forms.ModelForm):
+    class Meta:
+        model = ExtractSAP
+        fields = ('title', 'num_cadastre', 'stamped_document', )
+
+    def clean_stamped_document(self):
+        from .PDFutils import get_metadata
+        a = self.files['stamped_document']
+        key = get_metadata(a.temporary_file_path(), 'NumeroCadastre')
+        if key == 'Key Error':
+            raise forms.ValidationError("File is not associated with this Item")
+        return a
+
+    def __init__(self, *args, **kwargs):
+        super(StampedDocumentForm, self).__init__(*args, **kwargs)
+        self.helper = FormHelper()
+        self.helper.form_tag = False
+        self.helper.disable_csrf = True
+        self.helper.layout = Layout(
+            Field('title', readonly=True),
+            Field('num_cadastre', readonly=True),
+            'stamped_document'
+        )
+
+
 class UploadFileForm(forms.Form):
     file = forms.FileField(required=True)
     comment = forms.CharField(required=True)
