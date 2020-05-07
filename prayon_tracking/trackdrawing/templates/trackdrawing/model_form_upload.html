@@ -1,0 +1,15 @@
+{% extends 'trackdrawing/PageTemplate.html' %}
+{% load crispy_forms_tags %}
+
+{% block mainframe %}
+<br>
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% crispy form %}
+    <button type="submit">Upload</button>
+</form>
+
+    <p><a href="{% url 'StampView' %}">Return to stamp view</a></p>
+
+
+{% endblock %}
