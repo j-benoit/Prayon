@@ -124,6 +124,7 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = 'D:/PRAYON/PDF'
 STATIC_ROOT = os.path.join(BASE_DIR, '/static/')
 
@@ -131,5 +132,8 @@ STATICFILES_DIRS = (
     os.path.join(BASE_DIR, "static"),
 )
 
+context_processors = [
+    'django.template.context_processors.media', # set this explicitly
+]
 LOGIN_REDIRECT_URL = '/prayon/accueil'
 LOGIN_URL='/prayon/connexion'

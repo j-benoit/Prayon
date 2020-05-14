@@ -217,16 +217,17 @@ if __name__ == '__main__':
     # convert_dir_to_pdf(in_path, out_path)
 
     # Ajout de metadata
-    in_path = "D:\\AUSY\\Prayon\\20200506\\Multipage_doc"
-    out_path = "D:\\AUSY\\Prayon\\20200506\\PDF"
-    filename = '0067032-002-001.pdf'
+    in_path = "D:\\AUSY"
+    out_path = "D:\\AUSY"
+    filename = '0002660-022-000.tif'
     filestamp = 'Prayon_Stamp.pdf'
+    tiff2pdf(in_path, filename, out_path)
     # pdf_add_metadata(in_path, filename, 'NumeroCadastre', '00000-110-444')
     # pdf_add_Stamp(in_path, filename, filestamp)
     # Split_pdf(in_path, filename, out_path)
-    for file in os.listdir(in_path):
-        ext = os.path.splitext(file)[1]
-        if ext.casefold() in ['.tif', '.tiff']:
-            multitiff2pdf(in_path, file, out_path)
-        elif ext.casefold() in ['.pdf']:
-            Split_pdf(in_path, file, out_path)
+    # for file in os.listdir(in_path):
+    #     ext = os.path.splitext(file)[1]
+    #     if ext.casefold() in ['.tif', '.tiff']:
+    #         multitiff2pdf(in_path, file, out_path)
+    #     elif ext.casefold() in ['.pdf']:
+    #         Split_pdf(in_path, file, out_path)
