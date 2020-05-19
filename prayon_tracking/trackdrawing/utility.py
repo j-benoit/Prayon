@@ -130,3 +130,106 @@ def Modify_Multipages_drawing_from_csv():
                 record_to_duplicate.status = ''
                 record_to_duplicate.save()
                 log_info("Record " + cadastre + " copy to id " + str(record_to_duplicate.pk) + " , cadastre set to " + record_to_duplicate.num_cadastre, 'CreateDuplicate')
+
+
+def Modify_drawing_from_csv():
+    import csv
+    # fs = FileSystemStorage()
+    with open('D:\\Maj1805suite.csv', 'r') as file:
+        reader = csv.reader(file, delimiter=',')
+        for row in reader:
+            id, old_num, ordre, num_imp, num_trav = row
+            id_SAP = getattr(Work_data.objects.get(id=id),'id_SAP')
+            print(id,old_num,ordre,num_imp,num_trav)
+            record = ExtractSAP.objects.get(id=id_SAP.pk)
+            ordre = int(ordre) if ordre else None
+
+            # if old_num and old_num != record.old_num:
+            if old_num != record.old_num:
+                # change Num Ancien plan
+                log_info("Record " + record.num_cadastre + "(" + str(record.pk) + "), ancien plan changed to " + old_num + "("+record.old_num+")", 'BatchModification')
+                record.old_num = old_num
+                record.remark = "Ancien plan: " + old_num
+            if ordre != record.ordre:
+                # change Num ordre
+                log_info("Record " + record.num_cadastre + "(" + str(record.pk) + "), ordre changed to " + str(ordre) + "("+str(record.ordre)+")", 'BatchModification')
+                record.ordre = ordre
+            if num_imp != record.num_imp:
+                # change Num imputation
+                log_info("Record " + record.num_cadastre + "(" + str(record.pk) + "), imputation changed to " + num_imp + "("+record.num_imp+")", 'BatchModification')
+                record.num_imp = num_imp
+            if num_trav != record.num_trav:
+                # change Num travaux
+                log_info("Record " + record.num_cadastre + "(" + str(record.pk) + "), Num Trav changed to " + num_trav + "(" + record.num_trav + ")", 'BatchModification')
+                record.num_trav = num_trav
+            # os.rename(os.path.join(fs.location, filename),
+            #           os.path.join(os.path.join(fs.location, 'backup'), filename))
+            record.save()
+
+
+def create_new_drawing_id():
+    records = ExtractSAP.objects.all().exclude(status='BACKLOG') # Tous les enregistrements sauf ceux qui sont au Backlog
+    records = records.exclude(site='') # Supprime les enregistrements avec site = blank
+    records = records.exclude(div='') # Supprime les enregistrements avec div = blank
+    records = records.exclude(ordre=None) # Supprime les enregistrements avec numero ordre = blank
+    records_multi = records.exclude(typ__isnull=True) # Supprime les enregistrements avec Type = blank
+    records = records_multi.exclude(num_cadastre__regex=r'(F\d{3})$')  # Supprime les enregistrements multipage
+
+    list_test = list(records.values_list('site','div','ordre','typ__code').distinct())
+
+    # Process single page drawings
+    for site, div, ordre, type in list_test:
+        recs = records.filter(site=site, div=div, ordre=ordre, typ__code=type)
+
+        for num, rec in enumerate(recs):
+            # folio = rec.folio if rec.folio is not '' else 0
+            folio = 0 # Initilisation du folio, pas de multipage dans cette boucle
+
+            # rev = rec.rev if rec.rev is not '' else 0
+            rev = 0 # Initialisation de la révision
+
+            new_id = rec.site + "_" + format(int(rec.div), '03d') + "_" + str(rec.ordre) + "_" \
+                     + rec.typ.code + "_" + format(int(num), '06d') + "_" + format(int(folio), '03d') \
+                     + "_ASB_" + format(int(rev), '03d')
+
+            log_info(str(rec.id) + " new id: " + new_id + ', ' + rec.num_cadastre, 'NumberingDraws')
+
+            # Backup Record
+            rec.div = format(int(rec.div), '03d')
+            rec.num = format(int(num), '06d')
+            rec.folio = format(int(folio), '03d')
+            rec.rev = format(int(rev), '03d')
+            rec.id_doc = new_id
+            rec.save()
+
+    # Process multipage records
+    records = records_multi.filter(num_cadastre__regex=r'(F\d{3})$')  # Conserve uniquement les enregistrements multipage
+    list_test = list(records.values_list('site','div','ordre','typ__code').distinct())
+
+    for site, div, ordre, type in list_test:
+        num = records_multi.filter(site=site, div=format(int(div), '03d'), ordre=ordre, typ__code=type).count()
+        recs = records.filter(site=site, div=div, ordre=ordre, typ__code=type)
+        list_drw = list(recs.filter(num_cadastre__regex=r'F001$').values_list('num_cadastre', flat=True).distinct())
+        for drw in list_drw:
+            drawing = drw[:len(drw)-5]
+            rec_draw = recs.filter(num_cadastre__startswith=drawing)
+
+            for rec in rec_draw:
+                folio = int(rec.num_cadastre[-3:])-1
+                rev = 0  # Initialisation de la révision
+
+                new_id = rec.site + "_" + format(int(rec.div), '03d') + "_" + str(rec.ordre) + "_" \
+                         + rec.typ.code + "_" + format(int(num), '06d') + "_" + format(int(folio), '03d') \
+                         + "_ASB_" + format(int(rev), '03d')
+
+                log_info(str(rec.id) + " new id: " + new_id + ', ' + rec.num_cadastre, 'NumberingDraws')
+
+                # Backup Record
+                rec.div = format(int(rec.div), '03d')
+                rec.num = format(int(num), '06d')
+                rec.folio = format(int(folio), '03d')
+                rec.rev = format(int(rev), '03d')
+                rec.id_doc = new_id
+                rec.save()
+            num +=1
+
