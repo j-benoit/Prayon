@@ -101,7 +101,7 @@ class RetitleTable(tables.Table):
 
     def render_title(self, record):
         subtitle = record.title.split("-")
-        button_id = [s.strip().replace(' ', '_') for s in subtitle]
+        button_id = [s.strip().replace(' ', '_').replace('\'', '_') for s in subtitle]
         pre='<button type="submit" class="mx-1 btn btn-secondary" onClick="setDiv(this)" cat="title" id="'
         button = [pre + id + '">' for id in button_id]
         post='</button>'
@@ -111,7 +111,7 @@ class RetitleTable(tables.Table):
 
     def render_division_ausy(self, record):
         subtitle = record.division_ausy.split("-")
-        button_id = [s.strip().replace(' ', '_') for s in subtitle]
+        button_id = [s.strip().replace(' ', '_').replace('\'', '_') for s in subtitle]
         pre='<button type="submit" class="mx-1 btn btn-secondary" onClick="setDiv(this)" cat="title" id="'
         button = [pre + id + '">' for id in button_id]
         post='</button>'

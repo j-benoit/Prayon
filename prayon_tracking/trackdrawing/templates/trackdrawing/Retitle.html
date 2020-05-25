@@ -7,7 +7,7 @@
 <br>
 {% render_table table %}
 <br>
-<!--<button type="submit" class="btn btn-info btn-sm btn-block btn-block mx-1" onClick="SetTableTitle(this)">Modify All</button>-->
+<button type="submit" class="btn btn-info btn-sm btn-block btn-block mx-1" onClick="SetTableTitle(this)">Modify All</button>
 <br>
 <script>
 $(document).keydown(function(event){
@@ -93,25 +93,22 @@ const SetTitleRow = (htmlRow) => {
 };
 
 const SetNewValue = (model, pk, name, value) => {
-<!--    var dfd = $.Deferred();-->
     return $.ajax({
         url: '{% url "xed_post" %}',
         type:'POST',
+        async: false,
         data: {csrfmiddlewaretoken:'{{csrf_token}}',
             model: model,
             pk: pk,
             name: name,
             value: value},
         error: function(response, newValue) {
-<!--            dfd.resolve();-->
             return response.responseText;
         },
         success: function(response, newValue) {
-<!--            dfd.resolve();-->
             if(!response.success) return response.error_msg;
         }
     });
-<!--    return dfd.promise();-->
 }
 const SetTitle = (event, field) => {
     record_row = $(event).closest('tr');
