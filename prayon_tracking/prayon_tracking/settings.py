@@ -25,7 +25,7 @@ SECRET_KEY = 'as(=y3qv-2d^(=&zw5k1w3lt-b)wk--xj+97($z8^)7$@30e34'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['0.0.0.0', '127.0.0.1', '10.71.2.103', '10.79.61.26']
+ALLOWED_HOSTS = ['0.0.0.0', '127.0.0.1', '10.71.2.103', '10.79.61.26', '192.168.0.23', '91.174.168.129']
 
 
 # Application definition
@@ -67,6 +67,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.media', # set this explicitly
             ],
         },
     },
@@ -124,7 +125,7 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 # https://docs.djangoproject.com/en/2.2/howto/static-files/
 
 STATIC_URL = '/static/'
-MEDIA_URL = '/media/'
+MEDIA_URL = '/prayon/media/'
 MEDIA_ROOT = 'D:/PRAYON/PDF'
 STATIC_ROOT = os.path.join(BASE_DIR, '/static/')
 
@@ -132,8 +133,6 @@ STATICFILES_DIRS = (
     os.path.join(BASE_DIR, "static"),
 )
 
-context_processors = [
-    'django.template.context_processors.media', # set this explicitly
-]
+
 LOGIN_REDIRECT_URL = '/prayon/accueil'
 LOGIN_URL='/prayon/connexion'

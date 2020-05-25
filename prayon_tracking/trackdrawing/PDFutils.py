@@ -6,6 +6,7 @@ import logging
 from PyPDF4 import PdfFileReader, PdfFileWriter
 import win32com.client
 from PIL import Image
+import fitz
 
 
 def RenamePDFFiles():
@@ -202,9 +203,43 @@ def pdf_add_Stamp(path, file, stamp):
             file_out = open(os.path.join(path, 'new_w_stamp.pdf'), 'wb')
             pdf_writer.write(file_out)
             #
-            pdf_reader.close()
+            pdf.close()
             file_out.close()
             watermark.close()
+
+
+def pdf_add_Annot_old(path, file, stamp):
+    from pdf_annotate import PdfAnnotator, Location, Appearance
+    a = PdfAnnotator(os.path.join(path, file))
+    a.add_annotation(
+        'square',
+        Location(x1=50, y1=50, x2=100, y2=100, page=0),
+        Appearance(stroke_color=(1, 0, 0), stroke_width=5),
+    )
+    a.write(os.path.join(path, 'new_w_stamp.pdf'))  # or use overwrite=True if you feel lucky
+
+
+def pdf_add_Annot(path, file, Num_Draw):
+    # from pdf_annotate import PdfAnnotator, Location, Appearance
+    # some colors
+    blue = (0, 0, 1)
+    gold = (1, 1, 1)
+    doc = fitz.Document(os.path.join(path, file))
+    page = doc[0]
+    rp = page.bound()
+    box_width = rp.x1 /3 if rp.x1 < 3600 else 1200
+    font_size = int(box_width/1200 * 50)
+    box_height = int(font_size * 1.2)
+    print(box_width, font_size)
+    print(page.rotation)
+    r = fitz.Rect(rp.x1-box_width,rp.y1-box_height,rp.x1,rp.y1)
+    annot = page.addFreetextAnnot(r, Num_Draw, rotate=page.rotation)
+    annot.setBorder(width=0)
+    annot.update(fontsize=font_size, fill_color=gold)
+    # annot = page.addStampAnnot(r, stamp=10)  # 'Stamp'
+    # annot.setColors(stroke=green)
+    annot.update()
+    doc.save(os.path.join(path, 'new_w_stamp.pdf'))
 
 
 if __name__ == '__main__':
@@ -219,11 +254,11 @@ if __name__ == '__main__':
     # Ajout de metadata
     in_path = "D:\\AUSY"
     out_path = "D:\\AUSY"
-    filename = '0002660-022-000.tif'
-    filestamp = 'Prayon_Stamp.pdf'
-    tiff2pdf(in_path, filename, out_path)
+    filename = 'SP 049.pdf'
+    filestamp = 'FXSpydrnejxjdbtdwe.pdf'
+    # tiff2pdf(in_path, filename, out_path)
     # pdf_add_metadata(in_path, filename, 'NumeroCadastre', '00000-110-444')
-    # pdf_add_Stamp(in_path, filename, filestamp)
+    pdf_add_Annot(in_path, filename, 'EN_046_96008265_BLY_000009_000_ASB_000')
     # Split_pdf(in_path, filename, out_path)
     # for file in os.listdir(in_path):
     #     ext = os.path.splitext(file)[1]

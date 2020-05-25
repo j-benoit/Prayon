@@ -167,6 +167,19 @@ def Modify_drawing_from_csv():
             record.save()
 
 
+def Modify_division_from_csv():
+    import csv
+    # fs = FileSystemStorage()
+    with open('D:\\MajDiv_Client.csv', 'r') as file:
+        reader = csv.reader(file, delimiter='|')
+        for row in reader:
+            pk, div_client = row
+            record = ExtractSAP.objects.get(id=pk)
+            record.division_client = div_client
+            log_info("Record " + record.num_cadastre + "(" + str(
+                record.pk) + "), division client changed to " + div_client, 'DivClientModification')
+            record.save()
+
 def create_new_drawing_id():
     records = ExtractSAP.objects.all().exclude(status='BACKLOG') # Tous les enregistrements sauf ceux qui sont au Backlog
     records = records.exclude(site='') # Supprime les enregistrements avec site = blank

@@ -17,7 +17,7 @@ from django_tables2 import SingleTableView
 from .filters import Project_historyFilter, ExtractSAPFilter
 from .models import ExtractSAP, Work_data, Project_history, communData, Type
 from .forms import UpdatedInfoForm, ShowDistinct, UploadFileForm, StampedDocumentForm
-from .tables import ExtractTable, WorkTable, CheckExtractTable, ExtractTableExpanded, StampingTable
+from .tables import ExtractTable, WorkTable, CheckExtractTable, ExtractTableExpanded, StampingTable, RetitleTable, DivisionTable
 from .utils import has_group, remove_duplicate
 from .utility import *
 
@@ -75,6 +75,9 @@ def Test (request):
     #     record.comment = remove_duplicate(record.comment)
     #     record.save()
     # Modify_Multipages_drawing_from_csv()
+    # create_new_drawing_id()
+    # Modify_drawing_from_csv()
+    # Modify_division_from_csv()
 
     return redirect('Admin')
 
@@ -406,6 +409,47 @@ class ListBacklog(LoginRequiredMixin,SingleTableView):
         return table_data
 
 
+class RetitleView(LoginRequiredMixin, SingleTableView):
+    model = ExtractSAP
+    table_class = DivisionTable
+    template_name = "trackdrawing/View_Div.html"
+
+    def get_table_data(self):
+
+        user_drawing_id = [record.id_SAP for record in Work_data.objects.filter(id_retitle=self.request.user.id).exclude(division_status='CLOSED')]
+        current_division = Work_data.objects.filter(id_retitle=self.request.user.id, division_status='OPEN').first()
+        if not current_division:
+            # Get list of drawing without owner
+            new_division = Work_data.objects.filter(id_retitle__isnull=True).exclude(id_SAP__division_client='').exclude(status='BACKLOG').first()
+            record_to_process = ExtractSAP.objects.filter(division_client=new_division.id_SAP.division_client).exclude(status='BACKLOG')
+            for rec in record_to_process:
+                oworkdata = Work_data.objects.get(id_SAP=rec.pk)
+                oworkdata.id_retitle = self.request.user
+                oworkdata.save()
+            table_data = record_to_process.values('division_client').annotate(the_count=Count('division_client'))
+        else:
+            # Display division associated with current user
+            table_data = ExtractSAP.objects.filter(division_client=current_division.id_SAP.division_client).exclude(status='BACKLOG').values('division_client').annotate(the_count=Count('division_client'))
+
+        return table_data
+
+
+class EditDivView(LoginRequiredMixin, SingleTableView):
+    model =ExtractSAP
+    table_class = RetitleTable
+    template_name =  "trackdrawing/Retitle.html"
+    division_client = None
+    table_pagination = False
+
+    def get_table_data(self):
+        self.division_client = self.kwargs['division_client']
+        table_data = ExtractSAP.objects.filter(division_client=self.division_client).exclude(status='BACKLOG')
+        return table_data
+
+    def get_context_data(self, **kwargs):
+        context = super(EditDivView, self).get_context_data(**kwargs)
+        context['division_client'] = self.division_client
+        return context
 
 class StampView(LoginRequiredMixin, SingleTableView):
     model = ExtractSAP
@@ -892,6 +936,7 @@ def xed_post(request):
     request.POST['name']: name of the field to be set
     request.POST['value']: new value to be set
     """
+    # print(request.POST)
     try:
         if not 'name' in request.POST or not 'pk' in request.POST or not 'value' in request.POST:
             _data = {'success': False, 'error_msg': 'Error, missing POST parameter'}

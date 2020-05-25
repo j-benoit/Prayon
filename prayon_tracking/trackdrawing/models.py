@@ -75,6 +75,8 @@ class ExtractSAP(models.Model):
     file_exists = models.CharField(max_length=100, verbose_name='Existance fichier tif/pdf/dwg', blank=True)
 
     stamped_document = models.FileField(upload_to='stamped_PDF/', null=True)
+    division_client = models.CharField(max_length=150, verbose_name='Division section sous section client', blank=True)
+    division_ausy = models.CharField(max_length=150, verbose_name='Division section sous section AUSY', blank=True)
 
     status = models.CharField(max_length=11, blank=True, default='')
 
@@ -95,11 +97,17 @@ class Work_data(models.Model):
         ('INVALID', 'INVALID'),
         ('TO_RE-CHECK', 'TO_RE-CHECK')
     ]
+    DIVISION_STATUS = [
+        ('OPEN', 'OPEN'),
+        ('CLOSED', 'CLOSED'),
+    ]
     id_SAP = models.OneToOneField(ExtractSAP, on_delete=models.CASCADE)
     id_user = models.ForeignKey(User, on_delete=models.PROTECT,  related_name='requests_created')
     id_checker = models.ForeignKey(User, on_delete=models.PROTECT,  related_name='requests_checked', null=True)
     id_rechecker = models.ForeignKey(User, on_delete=models.PROTECT,  related_name='requests_rechecked', null=True)
+    id_retitle = models.ForeignKey(User, on_delete=models.PROTECT, related_name='requests_retitled', null=True)
     status = models.CharField(max_length=11, choices=DRAWING_STATUS, default='OPEN')
+    division_status = models.CharField(max_length=6, choices=DIVISION_STATUS, default='OPEN')
     created_date = models.DateField(auto_now_add=True)
     modified_date = models.DateField(auto_now=True)
     comment = models.TextField(blank=True)

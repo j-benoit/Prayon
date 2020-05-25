@@ -43,6 +43,8 @@ urlpatterns = [
     url(r'^Stamp$', views.StampView.as_view(), name='StampView'),
     url(r'^Stamp/Download/(?P<num_cadastre>\d+)$', views.DownloadDrawing, name='DownloadDrawing'),
     url(r'^Stamp/Upload/(?P<num_cadastre>\d+)$', views.UploadDrawing, name='UploadDrawing'),
+    url(r'^ReTitle$', views.RetitleView.as_view(), name='RetitleView'),
+    url(r'^ReTitle/(?P<division_client>.+?)/$', views.EditDivView.as_view(), name='EditDivView'),
     # url(r'^GroupUser', views.GroupUser, name='GroupUser'),
     url(r'^UpdateData$', views.UpdatedInfoCreate.as_view(), name='update_data'),
 

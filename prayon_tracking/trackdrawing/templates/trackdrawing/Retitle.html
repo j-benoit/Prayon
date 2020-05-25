@@ -1,0 +1,128 @@
+{% extends 'trackdrawing/PageTemplate.html' %}
+{% load Auth_extra %}
+{% load render_table from django_tables2 %}
+{% block mainframe %}
+<br>
+<h2>{{ division_client }}</h2>
+<br>
+{% render_table table %}
+<br>
+<button type="submit" class="btn btn-info btn-sm btn-block btn-block mx-1" onClick="SetTableTitle(this)">Modify All</button>
+<br>
+<script>
+$(document).keydown(function(event){
+if(event.which=="16")
+    shiftIsPressed = true;
+if(event.which=="17")
+    ctrlIsPressed = true;
+});
+
+$(document).keyup(function(){
+    shiftIsPressed = false;
+    ctrlIsPressed = false;
+});
+
+var shiftIsPressed = false;
+var ctrlIsPressed = false;
+
+const setDiv = (event, field) => {
+const id_elem = $(event).attr("id");
+if ($(event).hasClass("btn-success")) {
+    if (shiftIsPressed)
+    {
+        $("[id="+id_elem+"]").removeClass("btn-success");
+        $("[id="+id_elem+"]").addClass("btn-secondary");
+    } else {
+        $(event).removeClass("btn-success");
+        $(event).addClass("btn-secondary");
+    };
+    if (ctrlIsPressed)
+    {
+        if ($(event).next().is('button')){
+            $(event).next().after($(event));
+        }
+    }
+} else {
+    if (shiftIsPressed)
+    {
+        $("[id="+id_elem+"]").removeClass("btn-secondary");
+        $("[id="+id_elem+"]").addClass("btn-success");
+    } else {
+        $(event).removeClass("btn-secondary");
+        $(event).addClass("btn-success");
+    }
+}
+};
+
+const SetTitleRow = (htmlRow) => {
+    record_id = $(htmlRow).attr('data_id');
+    console.log(record_id);
+    div='';
+    newtitle='';
+    $('tr[data_id=' + record_id + ']>td:first-child>button').each(function() {
+        if ($(this).hasClass("btn-success")) {
+            $(this).removeClass("btn-success");
+            $(this).addClass("btn-secondary");
+            $(this).remove();
+            $('tr[data_id=' + record_id + ']>td:nth-child(2)').append($(this));
+        }
+    })
+    $('tr[data_id=' + record_id + ']>td:nth-child(2)>button').each(function() {
+        if ($(this).hasClass("btn-success")) {
+            $(this).removeClass("btn-success");
+            $(this).addClass("btn-secondary");
+            $(this).remove();
+            $('tr[data_id=' + record_id + ']>td:first-child').prepend($(this));
+        }
+    })
+    $('tr[data_id=' + record_id + ']>td:nth-child(7)>span').replaceWith('<span class="badge badge-success">CLOSED</span>')
+    $('tr[data_id=' + record_id + ']>td:first-child>button').each(function() {
+        if (newtitle) {newtitle = newtitle.concat(" - ").concat($(this).text());} else {newtitle = newtitle.concat($(this).text());}
+    })
+    $('tr[data_id=' + record_id + ']>td:nth-child(2)>button').each(function() {
+        if (div) {div = div.concat(" - ").concat($(this).text());} else {div = div.concat($(this).text());};
+    })
+    work_id = $('tr[data_id=' + record_id + ']>td:nth-child(6)').text()
+    console.log(div);
+    console.log(newtitle);
+<!--    SetNewValue('ExtractSAP',record_id, 'title', newtitle);-->
+<!--    $.when(SetNewValue('ExtractSAP',record_id, 'title', newtitle)).then(SetNewValue('ExtractSAP',record_id, 'division_ausy', div) );-->
+    SetNewValue('ExtractSAP',record_id, 'title', newtitle).done(function () {SetNewValue('ExtractSAP',record_id, 'division_ausy', div)});
+<!--    SetNewValue('ExtractSAP',record_id, 'division_ausy', div);-->
+    SetNewValue('Work_data',work_id, 'division_status', 'CLOSED');
+};
+
+const SetNewValue = (model, pk, name, value) => {
+<!--    var dfd = $.Deferred();-->
+    return $.ajax({
+        url: '{% url "xed_post" %}',
+        type:'POST',
+        data: {csrfmiddlewaretoken:'{{csrf_token}}',
+            model: model,
+            pk: pk,
+            name: name,
+            value: value},
+        error: function(response, newValue) {
+<!--            dfd.resolve();-->
+            return response.responseText;
+        },
+        success: function(response, newValue) {
+<!--            dfd.resolve();-->
+            if(!response.success) return response.error_msg;
+        }
+    });
+<!--    return dfd.promise();-->
+}
+const SetTitle = (event, field) => {
+    record_row = $(event).closest('tr');
+    SetTitleRow(record_row)
+};
+
+const SetTableTitle = (event) => {
+    title = $('#ReTitleTable tr').each(function() {
+        SetTitleRow($(this));
+    });
+};
+
+</script>
+{% endblock %}

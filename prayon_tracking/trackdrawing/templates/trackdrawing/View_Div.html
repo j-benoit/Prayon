@@ -1,0 +1,9 @@
+{% extends 'trackdrawing/PageTemplate.html' %}
+{% load Auth_extra %}
+{% load render_table from django_tables2 %}
+{% block mainframe %}
+
+
+{% render_table table %}
+
+{% endblock %}
