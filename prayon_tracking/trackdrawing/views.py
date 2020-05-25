@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.db.models import Count, Q
+from django.db.models import Count, Q, F
 from django.views.generic import UpdateView
 from django.views import View
 from django.contrib.auth.models import User, Group
@@ -89,7 +89,9 @@ def Export_Database(request):
         'id_user__username',
         'id_checker__username',
         'id_rechecker__username',
+        'id_retitle__username',
         'status',
+        'division_status',
         'created_date',
         'modified_date',
         'comment',
@@ -136,6 +138,8 @@ def Export_Database(request):
         'Transfert vers ordre',
         'Lien vers le serveur',
         'Titre du document',
+        'Division section sous section client',
+        'Division section sous section AUSY',
         'Catégorie de document',
         'Date d émission',
         'Provenance',
@@ -171,6 +175,7 @@ def Export_Database(request):
         'id user',
         'id checker',
         'id rechecker',
+        'id retitle',
         'created date',
         'modified date',
         'comment',
@@ -178,7 +183,8 @@ def Export_Database(request):
         'check time tracking',
         'id SAP_sap',
         'status',
-        'status_sap'
+        'status_sap',
+        'division status'
     ]
 
     # my "Excel" file, which is an in-memory output file (buffer)
@@ -407,6 +413,13 @@ class ListBacklog(LoginRequiredMixin,SingleTableView):
     def get_table_data(self):
         table_data = Work_data.objects.filter(Q(id_checker__pk=self.request.user.id) | Q(id_user__pk=self.request.user.id) | Q(id_rechecker__pk=self.request.user.id)).exclude(status='OPEN')
         return table_data
+
+    def get_context_data(self, **kwargs):
+        context = super(ListBacklog, self).get_context_data(**kwargs)
+        retitle_data = Work_data.objects.filter(id_retitle=self.request.user.id).exclude(status='BACKLOG').values(
+            division_client=F('id_SAP__division_client')).annotate(the_count=Count('division_client'))
+        context['retitle_table'] =  DivisionTable(retitle_data)
+        return context
 
 
 class RetitleView(LoginRequiredMixin, SingleTableView):
@@ -954,18 +967,20 @@ def xed_post(request):
         #
         # Record modification to log file
         #
-        SAP_log = logging.getLogger('ExtractSAP')
-        SAP_log.setLevel(logging.INFO)
-        SAPHandler = logging.FileHandler('ExtractSAP.log')
-        formatter = logging.Formatter('%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
-        SAPHandler.setFormatter(formatter)
+        from .utility import log_info
+        # SAP_log = logging.getLogger('ExtractSAP')
+        # SAP_log.setLevel(logging.INFO)
+        # SAPHandler = logging.FileHandler('ExtractSAP.log')
+        # formatter = logging.Formatter('%(asctime)s -- %(name)s -- %(levelname)s -- %(message)s')
+        # SAPHandler.setFormatter(formatter)
+        #
+        # SAP_log.addHandler(SAPHandler)
 
-        SAP_log.addHandler(SAPHandler)
-        SAP_log.info('SAP_id: ' + request.POST['pk'] + ' champ ' + request.POST['name'] + ' ' + old_value + ' changed to ' + request.POST['value'])
+        log_info('SAP_id: ' + request.POST['pk'] + ' champ ' + request.POST['name'] + ' ' + old_value + ' changed to ' + request.POST['value'], 'ExtractSAP')
 
         _obj.save()  # And save to DB
-        SAP_log.removeHandler(SAPHandler)
-        SAPHandler.close()
+        # SAP_log.removeHandler(SAPHandler)
+        # SAPHandler.close()
         _data = {'success': True}
         return JsonResponse(_data)
 
