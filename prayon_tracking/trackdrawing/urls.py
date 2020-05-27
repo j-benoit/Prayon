@@ -49,6 +49,7 @@ urlpatterns = [
     url(r'^UpdateData$', views.UpdatedInfoCreate.as_view(), name='update_data'),
 
     url(r'^xed_post$', views.xed_post, name='xed_post'),
+    url(r'^ajax/get_record_title/$', views.get_title, name='get_record_title'),
 ]
 
 if settings.DEBUG:

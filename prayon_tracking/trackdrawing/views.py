@@ -940,6 +940,14 @@ def DisplayDrawing(request, num_cadastre):
     # return render(request, 'trackdrawing/ExtractSAP_list.html', locals())
 
 
+def get_title(request):
+    record_id = request.GET.get('id', None)
+    data = {
+        'record_title': ExtractSAP.objects.get(pk=record_id).title
+    }
+    return JsonResponse(data)
+
+
 def xed_post(request):
     """
     X-Editable: handle post request to change the value of an attribute of an object

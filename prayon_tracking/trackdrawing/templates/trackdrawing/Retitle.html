@@ -9,7 +9,81 @@
 <br>
 <button type="submit" class="btn btn-info btn-sm btn-block btn-block mx-1" onClick="SetTableTitle(this)">Modify All</button>
 <br>
+
+<!--Modal-->
+<div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">New message</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <form>
+          <div class="form-group">
+            <label for="recipient-name" class="col-form-label">Titre:</label>
+            <input type="text" class="form-control" id="recipient-name">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" onClick="Set_new_title(this)">Send title</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+$('#exampleModal').on('show.bs.modal', function (event) {
+  var button = $(event.relatedTarget) // Button that triggered the modal
+  record_id = $(event.relatedTarget).closest('tr').attr('data_id')
+  // If necessary, you could initiate an AJAX request here (and then do the updating in a callback).
+  // Update the modal's content. We'll use jQuery here, but you could use a data binding library or other methods instead.
+  var modal = $(this)
+  modal.find('.modal-title').text('Modify Record Title')
+  modal.find('.modal-body input').attr('data-pk', record_id)
+  $.ajax({
+      url: '{% url "get_record_title" %}',
+      data: {
+        'id': record_id
+      },
+      dataType: 'json',
+      success: function (data) {
+        modal.find('.modal-body input').val(data.record_title)
+<!--        console.log(data.record_title)-->
+      }
+  });
+})
+
+const Set_new_title = (event) => {
+  var modal = $('#exampleModal')
+  var record_id = modal.find('.modal-body input').attr('data-pk')
+  var new_title = modal.find('.modal-body input').val()
+  var new_html_title = new_title.split("-")
+  var button_id = [];
+  $.each(new_html_title, function( index, value ) {
+    button_id.push($.trim(value).replace(/[_\s]/g, '_').replace(/[^a-z0-9\s]/g, '_'));
+  });
+  var pre = '<button type="submit" class="mx-1 btn btn-secondary" onClick="setDiv(this)" cat="title" id="'
+  var button = [];
+  $.each(button_id, function( index, value ) {
+    button.push(pre.concat(value, '">'));
+  });
+  var post = '</button>'
+  var final = [];
+  $.each(new_html_title, function( index, value ) {
+    final.push(button[index].concat($.trim(value), post));
+  });
+
+  SetNewValue('ExtractSAP',record_id, 'title', new_title)
+
+  $('tr[data_id=' + record_id + ']>td:first-child').html(final.join(""))
+  modal.modal('hide')
+}
+
 $(document).keydown(function(event){
 if(event.which=="16")
     shiftIsPressed = true;
@@ -75,14 +149,14 @@ const SetTitleRow = (htmlRow) => {
             $('tr[data_id=' + record_id + ']>td:first-child').prepend($(this));
         }
     })
-    $('tr[data_id=' + record_id + ']>td:nth-child(7)>span').replaceWith('<span class="badge badge-success">CLOSED</span>')
+    $('tr[data_id=' + record_id + ']>td:nth-child(8)>span').replaceWith('<span class="badge badge-success">CLOSED</span>')
     $('tr[data_id=' + record_id + ']>td:first-child>button').each(function() {
         if (newtitle) {newtitle = newtitle.concat(" - ").concat($(this).text());} else {newtitle = newtitle.concat($(this).text());}
     })
     $('tr[data_id=' + record_id + ']>td:nth-child(2)>button').each(function() {
         if (div) {div = div.concat(" - ").concat($(this).text());} else {div = div.concat($(this).text());};
     })
-    work_id = $('tr[data_id=' + record_id + ']>td:nth-child(6)').text()
+    work_id = $('tr[data_id=' + record_id + ']>td:nth-child(7)').text()
     console.log(div);
     console.log(newtitle);
 <!--    SetNewValue('ExtractSAP',record_id, 'title', newtitle);-->

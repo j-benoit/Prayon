@@ -6,6 +6,7 @@ from django.utils.text import slugify
 from django.core.files.storage import FileSystemStorage
 from django.utils.html import format_html
 import os
+import re
 
 
 def f_render_comment(commentaire):
@@ -81,7 +82,8 @@ class RetitleTable(tables.Table):
     division_ausy =tables.Column(default=' ', verbose_name='Division')
     num_cadastre = tables.LinkColumn('show_image', args=[A('pk')], attrs={"a": {"target": "pdfview"}},
                       verbose_name='View drawing')
-    edit = tables.TemplateColumn(template_name='trackdrawing/Update_DivTitle.html')
+    edit = tables.TemplateColumn(template_name='trackdrawing/Update_DivTitle.html', verbose_name='Modify Division')
+    modif = tables.TemplateColumn(template_name='trackdrawing/Modify_Title.html', verbose_name='Edit Title')
     id = tables.LinkColumn('edit_data', args=[A('pk')], verbose_name='Edit SAP')
     id_workdata = tables.Column(verbose_name='id',empty_values=())
     division_status = tables.Column(verbose_name='Status', empty_values=())
@@ -97,11 +99,11 @@ class RetitleTable(tables.Table):
             'data_id': lambda record: record.pk,
         }
 
-        fields = ("title",'division_ausy', "num_cadastre", 'edit','id', 'id_workdata')
+        fields = ("title",'division_ausy', "num_cadastre", 'edit', 'modif','id', 'id_workdata')
 
     def render_title(self, record):
         subtitle = record.title.split("-")
-        button_id = [s.strip().replace(' ', '_').replace('\'', '_') for s in subtitle]
+        button_id = [re.sub(r'[^a-zA-Z0-9 ]',r'_',s.strip()).replace(' ', '_') for s in subtitle]
         pre='<button type="submit" class="mx-1 btn btn-secondary" onClick="setDiv(this)" cat="title" id="'
         button = [pre + id + '">' for id in button_id]
         post='</button>'
@@ -111,7 +113,7 @@ class RetitleTable(tables.Table):
 
     def render_division_ausy(self, record):
         subtitle = record.division_ausy.split("-")
-        button_id = [s.strip().replace(' ', '_').replace('\'', '_') for s in subtitle]
+        button_id = [re.sub(r'[^a-zA-Z0-9 ]',r'_',s.strip()).replace(' ', '_') for s in subtitle]
         pre='<button type="submit" class="mx-1 btn btn-secondary" onClick="setDiv(this)" cat="title" id="'
         button = [pre + id + '">' for id in button_id]
         post='</button>'
