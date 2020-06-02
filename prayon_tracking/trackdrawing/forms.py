@@ -74,7 +74,8 @@ class ShowDistinct(forms.ModelForm):
     FIELD_CHOICE = [
         ('author', 'Author'),
         ('fournisseur', 'Entreprise'),
-        ('title', 'titre')
+        ('title', 'titre'),
+        ('division_ausy', 'Division section sous section AUSY')
     ]
     field_choice = forms.ChoiceField(choices = FIELD_CHOICE)
     contains = forms.CharField(required=False)

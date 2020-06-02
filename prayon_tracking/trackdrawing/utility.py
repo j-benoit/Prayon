@@ -1,6 +1,7 @@
 from django.core.files.storage import FileSystemStorage
 from django.db.models import Count
 from django.shortcuts import redirect
+from django.contrib.auth.models import User
 from .models import ExtractSAP, Work_data, Project_history, communData, Type
 import logging, os
 
@@ -198,8 +199,8 @@ def create_new_drawing_id():
             # folio = rec.folio if rec.folio is not '' else 0
             folio = 0 # Initilisation du folio, pas de multipage dans cette boucle
 
-            # rev = rec.rev if rec.rev is not '' else 0
-            rev = 0 # Initialisation de la révision
+            rev = rec.rev if rec.rev is not '' else 0
+            # rev = 0 # Initialisation de la révision
 
             new_id = rec.site + "_" + format(int(rec.div), '03d') + "_" + str(rec.ordre) + "_" \
                      + rec.typ.code + "_" + format(int(num), '06d') + "_" + format(int(folio), '03d') \
@@ -229,7 +230,7 @@ def create_new_drawing_id():
 
             for rec in rec_draw:
                 folio = int(rec.num_cadastre[-3:])-1
-                rev = 0  # Initialisation de la révision
+                rev = rec.rev if rec.rev is not '' else 0 # Initialisation de la révision
 
                 new_id = rec.site + "_" + format(int(rec.div), '03d') + "_" + str(rec.ordre) + "_" \
                          + rec.typ.code + "_" + format(int(num), '06d') + "_" + format(int(folio), '03d') \
@@ -245,4 +246,118 @@ def create_new_drawing_id():
                 rec.id_doc = new_id
                 rec.save()
             num +=1
+
+
+def Modify_Num_Cadastre_from_csv():
+    import csv
+    # fs = FileSystemStorage()
+    with open('D:\\9_Unsplit.csv', 'r') as file:
+        reader = csv.reader(file, delimiter='|')
+        for row in reader:
+            pk, num_cadastre = row
+            record = ExtractSAP.objects.get(id=Work_data.objects.get(id=pk).id_SAP.pk)
+            record.num_cadastre = num_cadastre
+            log_info("Record " + record.num_cadastre + "(" + str(
+                record.pk) + "), numero cadastre changed to " + num_cadastre, 'ModifBase200602')
+            record.save()
+
+    file.close()
+    with open('D:\\8_deleterecord.csv', 'r') as file:
+        reader = csv.reader(file, delimiter='|')
+        for row in reader:
+            pk = int(row[0])
+            owork = Work_data.objects.get(id=pk)
+            record = ExtractSAP.objects.get(id=owork.id_SAP.pk)
+            log_info("Record " + record.num_cadastre + "(" + str(
+                record.pk) + "), suppressed", 'ModifBase200602')
+            owork.delete()
+            record.delete()
+
+    file.close()
+
+    with open('D:\\6_NoFile.csv', 'r') as file:
+        reader = csv.reader(file, delimiter='|')
+        for row in reader:
+            pk = int(row[0])
+            owork = Work_data.objects.get(id=pk)
+            record = ExtractSAP.objects.get(id=owork.id_SAP.pk)
+            owork.status = 'BACKLOG'
+            record.status = 'BACKLOG'
+            record.file_exists ='N/A'
+
+            log_info("Record " + record.num_cadastre + "(" + str(
+                record.pk) + "), status changed to BACKLOG (no associated file)", 'ModifBase200602')
+            owork.save()
+            record.save()
+
+    file.close()
+
+    with open('D:\\5_CancelFile.csv', 'r') as file:
+        reader = csv.reader(file, delimiter='|')
+        for row in reader:
+            pk = int(row[0])
+            owork = Work_data.objects.get(id=pk)
+            record = ExtractSAP.objects.get(id=owork.id_SAP.pk)
+            if record.remark:
+                record.remark = record.remark + '\nPLAN ANNULE'
+            else:
+                record.remark = 'PLAN ANNULE'
+
+            log_info("Record " + record.num_cadastre + "(" + str(
+                record.pk) + "), 'PLAN ANNULE' added to remark", 'ModifBase200602')
+            record.save()
+
+    file.close()
+
+    # 3 & 4_à gérer en folio déjà splitté
+    with open('D:\\3_4_duplicate.csv', 'r') as file:
+        reader = csv.reader(file, delimiter='|')
+        for row in reader:
+            pk = int(row[0])
+            owork = Work_data.objects.get(id=pk)
+            record_to_duplicate = ExtractSAP.objects.get(id=owork.id_SAP.pk)
+            cadastre = record_to_duplicate.num_cadastre
+            filename = cadastre + '.pdf'
+            # change Num cadastre to add Folio n°1
+            record_to_duplicate.num_cadastre = cadastre + "-F001"
+            record_to_duplicate.status = ''
+            record_to_duplicate.file_exists = ''
+            record_to_duplicate.remark = ''
+            log_info("Record " + cadastre + "(" + str(record_to_duplicate.pk) + "), cadastre set to " + record_to_duplicate.num_cadastre, 'ModifBase200602')
+            # os.rename(os.path.join(fs.location, filename),
+            #           os.path.join(os.path.join(fs.location, 'backup'), filename))
+            record_to_duplicate.save()
+            for page in range(1,int(row[1])):
+                record_to_duplicate.pk = None # Copy Object
+                record_to_duplicate.num_cadastre = cadastre + "-F" + format((page + 1), '03d')
+                record_to_duplicate.status = ''
+                record_to_duplicate.save()
+                log_info("Record " + cadastre + " copy to id " + str(record_to_duplicate.pk) + " , cadastre set to " + record_to_duplicate.num_cadastre, 'ModifBase200602')
+            owork.delete()
+    # 1 & 2_à gérer en folio déjà splitté
+    with open('D:\\1_2_duplicate.csv', 'r') as file:
+        reader = csv.reader(file, delimiter='|')
+        for row in reader:
+            new_cadastre, record_to_update, record_to_duplicate = row
+            if record_to_update:
+                owork = Work_data.objects.get(id_SAP__pk=record_to_update)
+                record = ExtractSAP.objects.get(id=record_to_update)
+                cadastre = record.num_cadastre
+                filename = cadastre + '.pdf'
+                # change Num cadastre to add Folio n°1
+                record.num_cadastre = new_cadastre
+                record.status = ''
+                record.file_exists = ''
+                record.remark = ''
+                log_info("Record " + cadastre + "(" + str(record.pk) + "), cadastre set to " + new_cadastre, 'ModifBase200602')
+                record.save()
+                owork.delete()
+            if record_to_duplicate:
+                record = ExtractSAP.objects.get(id=record_to_duplicate)
+                cadastre = record.num_cadastre
+                record.pk = None # Copy Object
+                record.num_cadastre = new_cadastre
+                record.status = ''
+                record.save()
+                log_info("Record " + cadastre + " copy to id " + str(record.pk) + " , cadastre set to " + new_cadastre, 'ModifBase200602')
 

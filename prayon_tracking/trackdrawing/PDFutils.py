@@ -75,9 +75,9 @@ def multitiff2pdf(path, file, Out_Path):
     img = Image.open(os.path.join(path, file))
     nb_frame = img.n_frames
     img.close()
-    for frame in range(0, nb_frame):
+    for frame in range(1, nb_frame+1):
         QP = win32com.client.Dispatch("DebenuPDFLibrary64Lite1114.PDFLibrary")
-        Out_filename = os.path.splitext(file)[0] +"-F"+ format((frame + 1), '03d') +".pdf"
+        Out_filename = os.path.splitext(file)[0] +"-F"+ format((frame ), '03d') +".pdf"
         QP.AddImageFromFile(os.path.join(path, file), frame)
         lWidth = QP.ImageWidth()
         lHeight = QP.ImageHeight()
@@ -133,7 +133,8 @@ def convert_dir_to_pdf(input_dir, output_dir):
             if QP.SaveToFile(os.path.join(output_dir, file)) == 1:
                 if pages > 1:
                     log_info("File " + file + " has Multi Pages", log_file)
-                log_info("File " + file + " copied to output directory (rotated -90°)", log_file)
+                # log_info("File " + file + " copied to output directory (rotated -90°)", log_file)
+                log_info("File " + file + " copied to output directory", log_file)
             else:
                 log_info("File " + file + " could not be written", log_file)
 
@@ -224,11 +225,12 @@ def pdf_add_Annot(path, file, Num_Draw):
     # some colors
     blue = (0, 0, 1)
     gold = (1, 1, 1)
+    max_width = 1200
     doc = fitz.Document(os.path.join(path, file))
     page = doc[0]
     rp = page.bound()
-    box_width = rp.x1 /3 if rp.x1 < 3600 else 1200
-    font_size = int(box_width/1200 * 50)
+    box_width = rp.x1 /3 if rp.x1 < (max_width * 3) else max_width
+    font_size = int(box_width/max_width * 72)
     box_height = int(font_size * 1.2)
     print(box_width, font_size)
     print(page.rotation)
@@ -252,13 +254,14 @@ if __name__ == '__main__':
     # convert_dir_to_pdf(in_path, out_path)
 
     # Ajout de metadata
-    in_path = "D:\\AUSY"
-    out_path = "D:\\AUSY"
+    in_path = "C:\\Users\\Jerome\\Downloads\\PLANS MODIF BASE\\2_fichier à traiter normalement mais à renommer en incrémentant la révision (3 derniers chiffres)"
+    out_path = "D:\\PRAYON\\PDF"
     filename = 'SP 049.pdf'
     filestamp = 'FXSpydrnejxjdbtdwe.pdf'
+    convert_dir_to_pdf(in_path,out_path)
     # tiff2pdf(in_path, filename, out_path)
     # pdf_add_metadata(in_path, filename, 'NumeroCadastre', '00000-110-444')
-    pdf_add_Annot(in_path, filename, 'EN_046_96008265_BLY_000009_000_ASB_000')
+    # pdf_add_Annot(in_path, filename, 'EN_046_96008265_BLY_000009_000_ASB_000')
     # Split_pdf(in_path, filename, out_path)
     # for file in os.listdir(in_path):
     #     ext = os.path.splitext(file)[1]

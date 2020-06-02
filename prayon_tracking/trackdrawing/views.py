@@ -1,47 +1,42 @@
-from django.shortcuts import render
-from django.db.models import Count, Q, F
-from django.views.generic import UpdateView
-from django.views import View
-from django.contrib.auth.models import User, Group
-from django.core.files.storage import FileSystemStorage
-from django.shortcuts import redirect
-from django.urls import reverse_lazy
-from django.http import HttpResponse, HttpResponseNotFound, JsonResponse, FileResponse
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.utils.dateparse import parse_duration
-from django.apps import apps
-from django.db.models import ForeignKey
+import logging
+import os
+import os.path
+import random
+from datetime import date, timedelta
+from itertools import cycle
 
+import img2pdf
+import pandas as pd
+import pygal
+from PIL import Image
+from django.apps import apps
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import User, Group
+from django.db.models import ForeignKey
+from django.db.models import Q, F
+from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
+from django.shortcuts import render
+from django.urls import reverse_lazy
+from django.utils.dateparse import parse_duration
+from django.views import View
+from django.views.generic import UpdateView
 from django_tables2 import SingleTableView
 
 from .filters import Project_historyFilter, ExtractSAPFilter
-from .models import ExtractSAP, Work_data, Project_history, communData, Type
 from .forms import UpdatedInfoForm, ShowDistinct, UploadFileForm, StampedDocumentForm
-from .tables import ExtractTable, WorkTable, CheckExtractTable, ExtractTableExpanded, StampingTable, RetitleTable, DivisionTable
-from .utils import has_group, remove_duplicate
+from .tables import ExtractTable, WorkTable, CheckExtractTable, ExtractTableExpanded, StampingTable, RetitleTable, \
+    DivisionTable
 from .utility import *
-
-from PIL import Image
-import img2pdf
-
-import pandas as pd
-
-from itertools import cycle
-import os.path
-import pygal
-from datetime import date, timedelta
-import random
-import os
-
-import logging
+from .utils import has_group
 
 try:
-    from io import BytesIO as IO # for modern python
+    from io import BytesIO as IO  # for modern python
 except ImportError:
-    from io import StringIO as IO # for legacy python
+    from io import StringIO as IO  # for legacy python
+
 
 # Create your views here.
-def Dispatch_Work (request):
+def Dispatch_Work(request):
     """
     Dispatch drawings among users in group 'Prod'
     :param request:
@@ -49,7 +44,8 @@ def Dispatch_Work (request):
     """
     drawings_per_user = int(request.POST["plans_nb"])
     already_dispatched_records = [record.id_SAP.pk for record in Work_data.objects.all()]
-    record_to_dispatched = ExtractSAP.objects.all().exclude(id__in=already_dispatched_records).order_by('id')[:drawings_per_user]
+    record_to_dispatched = ExtractSAP.objects.all().exclude(id__in=already_dispatched_records).order_by('id')[
+                           :drawings_per_user]
     prod_user = User.objects.filter(groups__name='Prod').order_by('id')
     pool_user = cycle(prod_user)
     for record in record_to_dispatched:
@@ -59,7 +55,8 @@ def Dispatch_Work (request):
 
     return redirect('dash')
 
-def Test (request):
+
+def Test(request):
     # Modify_drawing_status()
     # Modify_drawing_status_from_csv()
     # Delete_record_from_csv()
@@ -78,6 +75,7 @@ def Test (request):
     # create_new_drawing_id()
     # Modify_drawing_from_csv()
     # Modify_division_from_csv()
+    Modify_Num_Cadastre_from_csv()
 
     return redirect('Admin')
 
@@ -201,7 +199,8 @@ def Export_Database(request):
     # but an error message when you try to open your zero length file in Excel
     excel_file.seek(0)
 
-    response = HttpResponse(excel_file.read(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response = HttpResponse(excel_file.read(),
+                            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = 'attachment; filename="Export_SAP.xlsx"'
     return response
 
@@ -215,7 +214,8 @@ def Admin(request):
     groupes = Group.objects.all().exclude(name='CP')
     usr = User.objects.all()
 
-    old_user_list = Work_data.objects.filter(status__in=['OPEN', 'BACKLOG']).values('id_user', 'id_user__username').distinct()
+    old_user_list = Work_data.objects.filter(status__in=['OPEN', 'BACKLOG']).values('id_user',
+                                                                                    'id_user__username').distinct()
     new_user_list = User.objects.all()
     if request.method == 'POST':
         if 'transfer_task' in request.POST:
@@ -239,8 +239,7 @@ def Admin(request):
     return render(request, "trackdrawing/Admin.html", locals())
 
 
-def nbChecker (request):
-   
+def nbChecker(request):
     tmp = communData.objects.get(pk=1)
     tmp.nb_plan_check = request.POST["plans_nb"]
     tmp.save()
@@ -249,7 +248,6 @@ def nbChecker (request):
 
 
 def Dashboard(request):
-    
     if has_group(request.user, 'CP'):
         # Extract history data from DB to Dataframe
         history_filter = Project_historyFilter(request.GET, queryset=Project_history.objects.all())
@@ -259,19 +257,21 @@ def Dashboard(request):
         df = df.set_index(['id_user_id', 'date'])
         # Create list for comprehensive username (instead of user id)
         list_user = {record.pk: record.username for record in User.objects.filter(pk__in=
-                                                                       df.index
-                                                                       .get_level_values('id_user_id').to_list())}
+                                                                                  df.index
+                                                                                  .get_level_values(
+                                                                                      'id_user_id').to_list())}
 
         for key, value in list_user.items():
             df.rename(index={key: value}, inplace=True)
         # order df by descending index
-        df.sort_index(level=('id_user_id','date'), ascending=False, inplace=True)
+        df.sort_index(level=('id_user_id', 'date'), ascending=False, inplace=True)
         # keep only the n top row for each user
         top = 1
         df = df.groupby(level=0).apply(lambda df: df[:top])
         df.index = df.index.droplevel(0)
 
-        dfextract = df.iloc[ : , df.columns.isin({'open_drawings','backlog_drawings','closed_drawings','checked_drawings','invalid_drawings'})]
+        dfextract = df.iloc[:, df.columns.isin(
+            {'open_drawings', 'backlog_drawings', 'closed_drawings', 'checked_drawings', 'invalid_drawings'})]
         # Transfer dataframe data to pygal Chart
         line_chart = pygal.StackedBar()
         line_chart.title = 'Users evolution   '
@@ -281,8 +281,8 @@ def Dashboard(request):
         # Render chart to html for template
         chart_line = line_chart.render_data_uri()
 
-        dfextract = df.iloc[ :, df.columns.isin({'avg_closed_time', 'avg_backlog_time'})]
-        dfextract['Avg'] = dfextract.apply(lambda row : (row.avg_closed_time + row.avg_backlog_time)/2, axis=1)
+        dfextract = df.iloc[:, df.columns.isin({'avg_closed_time', 'avg_backlog_time'})]
+        dfextract['Avg'] = dfextract.apply(lambda row: (row.avg_closed_time + row.avg_backlog_time) / 2, axis=1)
         # print(dfextract)
         styles = [
             {'selector': "th.blank", 'props': [('display', 'none')]},  # hide dataframe header (ie: the skill id)
@@ -297,7 +297,7 @@ def Dashboard(request):
             .format({'date': "{:%d/%m/%Y}",
                      'avg_closed_time': lambda x: printNiceTimeDelta(x),
                      'avg_backlog_time': lambda x: printNiceTimeDelta(x),
-                     'Avg': lambda x: printNiceTimeDelta(x)})\
+                     'Avg': lambda x: printNiceTimeDelta(x)}) \
             .set_table_styles(styles) \
             .render()
 
@@ -307,7 +307,8 @@ def Dashboard(request):
             if history_filter.data['id_user']:
                 data = data.filter(id_user__pk__in=[int(x) for x in history_filter.data.getlist('id_user')])
             if history_filter.data['start_date'] and history_filter.data['end_date']:
-                data = data.filter(date__gte=history_filter.data['start_date'], date__lte=history_filter.data['end_date'])
+                data = data.filter(date__gte=history_filter.data['start_date'],
+                                   date__lte=history_filter.data['end_date'])
             elif history_filter.data['start_date']:
                 data = data.filter(date__gte=history_filter.data['start_date'])
             elif history_filter.data['end_date']:
@@ -329,13 +330,14 @@ def Dashboard(request):
         new_df = new_df.set_index(['date', 'id_user_id'])
         dfextract = new_df.groupby(level=[0]).sum()
 
-        dfextract = dfextract.iloc[ : , dfextract.columns.isin({'open_drawings',
-                                                                'backlog_drawings',
-                                                                'closed_drawings',
-                                                                'checked_drawings',
-                                                                'invalid_drawings'})]
+        dfextract = dfextract.iloc[:, dfextract.columns.isin({'open_drawings',
+                                                              'backlog_drawings',
+                                                              'closed_drawings',
+                                                              'checked_drawings',
+                                                              'invalid_drawings'})]
         # add column with closed/Checked & invalid data
-        dfextract['Completed_drawings'] = dfextract.apply(lambda row: (row.closed_drawings + row.checked_drawings + row.invalid_drawings), axis=1)
+        dfextract['Completed_drawings'] = dfextract.apply(
+            lambda row: (row.closed_drawings + row.checked_drawings + row.invalid_drawings), axis=1)
         xy_chart = pygal.DateTimeLine(x_label_rotation=35)
         xy_chart.title = 'Cumulé équipe'
         for col in dfextract.columns.to_list():
@@ -362,17 +364,19 @@ def Dashboard(request):
             .format({'date': "{:%d/%m/%Y}",
                      'avg_closed_time': lambda x: printNiceTimeDelta(x),
                      'avg_backlog_time': lambda x: printNiceTimeDelta(x),
-                     'Avg': lambda x: printNiceTimeDelta(x)})\
+                     'Avg': lambda x: printNiceTimeDelta(x)}) \
             .set_table_styles(styles) \
             .render()
 
         return render(request, "trackdrawing/dashboradAdmin.html", locals())
     else:
-        recheck_today = Work_data.objects.filter(id_rechecker__pk = request.user.id).exclude(modified_date__lt=date.today())
+        recheck_today = Work_data.objects.filter(id_rechecker__pk=request.user.id).exclude(
+            modified_date__lt=date.today())
         recheck_before = Work_data.objects.filter(id_rechecker__pk=request.user.id, modified_date__lt=date.today())
-        count_recheck_today = {stat: len(recheck_today.filter(status=stat)) for stat in ['BACKLOG', 'CLOSED', 'CHECKED', 'INVALID', 'TO_RE-CHECK']}
-        count_recheck_before = {stat: len(recheck_before.filter(status=stat)) for stat in
+        count_recheck_today = {stat: len(recheck_today.filter(status=stat)) for stat in
                                ['BACKLOG', 'CLOSED', 'CHECKED', 'INVALID', 'TO_RE-CHECK']}
+        count_recheck_before = {stat: len(recheck_before.filter(status=stat)) for stat in
+                                ['BACKLOG', 'CLOSED', 'CHECKED', 'INVALID', 'TO_RE-CHECK']}
         data = Project_history.objects.filter(id_user__pk=request.user.id)
         df = pd.DataFrame.from_records(data.values())
         df = df.sort_values('date', ascending=False)
@@ -381,8 +385,8 @@ def Dashboard(request):
 
 # Define helper function
 def fill_missing(grp):
-    res = grp.set_index('date')\
-    .fillna(method='ffill')
+    res = grp.set_index('date') \
+        .fillna(method='ffill')
     del res['id_user_id']
     return res
 
@@ -396,29 +400,32 @@ def printNiceTimeDelta(value):
             out = str(delay).replace("0 days ", "")
         outAr = out.split(':')
         outAr = ["%02d" % (int(float(x))) for x in outAr]
-        out   = ":".join(outAr)
+        out = ":".join(outAr)
         return out
     else:
         return ""
 
 
-class ListBacklog(LoginRequiredMixin,SingleTableView):
+class ListBacklog(LoginRequiredMixin, SingleTableView):
     model = Work_data
     context_object_name = "backlog"
     table_class = WorkTable
     template_name = "trackdrawing/Backlog_list.html"
     table_pagination = False
+
     # paginate_by = 10
 
     def get_table_data(self):
-        table_data = Work_data.objects.filter(Q(id_checker__pk=self.request.user.id) | Q(id_user__pk=self.request.user.id) | Q(id_rechecker__pk=self.request.user.id)).exclude(status='OPEN')
+        table_data = Work_data.objects.filter(
+            Q(id_checker__pk=self.request.user.id) | Q(id_user__pk=self.request.user.id) | Q(
+                id_rechecker__pk=self.request.user.id)).exclude(status='OPEN')
         return table_data
 
     def get_context_data(self, **kwargs):
         context = super(ListBacklog, self).get_context_data(**kwargs)
         retitle_data = Work_data.objects.filter(id_retitle=self.request.user.id).exclude(status='BACKLOG').values(
             division_client=F('id_SAP__division_client')).annotate(the_count=Count('division_client'))
-        context['retitle_table'] =  DivisionTable(retitle_data)
+        context['retitle_table'] = DivisionTable(retitle_data)
         return context
 
 
@@ -429,12 +436,15 @@ class RetitleView(LoginRequiredMixin, SingleTableView):
 
     def get_table_data(self):
 
-        user_drawing_id = [record.id_SAP for record in Work_data.objects.filter(id_retitle=self.request.user.id).exclude(division_status='CLOSED')]
+        user_drawing_id = [record.id_SAP for record in
+                           Work_data.objects.filter(id_retitle=self.request.user.id).exclude(division_status='CLOSED')]
         current_division = Work_data.objects.filter(id_retitle=self.request.user.id, division_status='OPEN').first()
         if not current_division:
             # Get list of drawing without owner
-            new_division = Work_data.objects.filter(id_retitle__isnull=True).exclude(id_SAP__division_client='').exclude(status='BACKLOG').first()
-            record_to_process = ExtractSAP.objects.filter(division_client=new_division.id_SAP.division_client).exclude(status='BACKLOG')
+            new_division = Work_data.objects.filter(id_retitle__isnull=True).exclude(
+                id_SAP__division_client='').exclude(status='BACKLOG').first()
+            record_to_process = ExtractSAP.objects.filter(division_client=new_division.id_SAP.division_client).exclude(
+                status='BACKLOG')
             for rec in record_to_process:
                 oworkdata = Work_data.objects.get(id_SAP=rec.pk)
                 oworkdata.id_retitle = self.request.user
@@ -442,15 +452,16 @@ class RetitleView(LoginRequiredMixin, SingleTableView):
             table_data = record_to_process.values('division_client').annotate(the_count=Count('division_client'))
         else:
             # Display division associated with current user
-            table_data = ExtractSAP.objects.filter(division_client=current_division.id_SAP.division_client).exclude(status='BACKLOG').values('division_client').annotate(the_count=Count('division_client'))
+            table_data = ExtractSAP.objects.filter(division_client=current_division.id_SAP.division_client).exclude(
+                status='BACKLOG').values('division_client').annotate(the_count=Count('division_client'))
 
         return table_data
 
 
 class EditDivView(LoginRequiredMixin, SingleTableView):
-    model =ExtractSAP
+    model = ExtractSAP
     table_class = RetitleTable
-    template_name =  "trackdrawing/Retitle.html"
+    template_name = "trackdrawing/Retitle.html"
     division_client = None
     table_pagination = False
 
@@ -463,6 +474,7 @@ class EditDivView(LoginRequiredMixin, SingleTableView):
         context = super(EditDivView, self).get_context_data(**kwargs)
         context['division_client'] = self.division_client
         return context
+
 
 class StampView(LoginRequiredMixin, SingleTableView):
     model = ExtractSAP
@@ -487,14 +499,15 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
     paginate_by = 10
 
     def get_table_data(self):
-        if(has_group(self.request.user,'Check')) :
+        if (has_group(self.request.user, 'Check')):
             # L'utilisateur connecté fait parti du groupe checker,
             # On récupère sa liste de plan à checker
             nb_plan_c_max = communData.objects.get(pk=1).nb_plan_check
             date_jour = date.today()
             date_veille = date_jour - timedelta(1 if date_jour.weekday() != 0 else 3)
             # date_veille = date_jour - timedelta(4 if date_jour.weekday() != 0 else 3)
-            record_to_check = Work_data.objects.filter(id_checker__pk=self.request.user.id, modified_date=date_jour, status='CLOSED')
+            record_to_check = Work_data.objects.filter(id_checker__pk=self.request.user.id, modified_date=date_jour,
+                                                       status='CLOSED')
             if len(record_to_check) != 0:
                 # La liste des plans à checker est déjà définie pour date_jour
                 table_data = []
@@ -504,7 +517,8 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
             else:
                 # La liste des plans à checker n'est pas définie pour date_jour
                 # Récupère les obj workdata CLOSED avec idchecker et date_modified < date_jour
-                record_to_reset = Work_data.objects.filter(id_checker__pk=self.request.user.id, modified_date__lt=date_jour, status='CLOSED')
+                record_to_reset = Work_data.objects.filter(id_checker__pk=self.request.user.id,
+                                                           modified_date__lt=date_jour, status='CLOSED')
                 # set id checker to null
                 for record in record_to_reset:
                     record.id_checker = None
@@ -514,7 +528,7 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
 
                 # Récupère les obj workdata CLOSED sans idchecker et date_modified = date_veille
                 record_list_check = Work_data.objects.filter(id_checker__isnull=True, modified_date=date_veille,
-                                                           status='CLOSED')
+                                                             status='CLOSED')
                 # Extract de la liste des utilisateurs à checker
                 user_to_check = record_list_check.values('id_user').exclude(id_user__pk__in=[1, 2, 7]).distinct()
                 # Nombre de plan à checker par utilisateur
@@ -540,27 +554,29 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
                         tmp_table_data.append(ExtractSAP.objects.get(id=checked_record.id_SAP.pk))
 
                 return tmp_table_data
-        elif not (has_group(self.request.user,'postrait_gp')):
+        elif not (has_group(self.request.user, 'postrait_gp')):
             # L'utilisateur connecté ne fait pas partie du groupe checker
             # On récupère sa liste de plan au status OPEN
-            user_drawing_list = [record.id_SAP.pk for record in Work_data.objects.filter(id_user__pk=self.request.user.id, status__in=['OPEN'])]
+            user_drawing_list = [record.id_SAP.pk for record in
+                                 Work_data.objects.filter(id_user__pk=self.request.user.id, status__in=['OPEN'])]
             table_data = ExtractSAP.objects.filter(id__in=user_drawing_list)
             if table_data.count() == 0:
                 # L'utilisateur n'a plus de plan affecté
                 # On lui affecte automatiquement une nouvelle liasse
                 next_drawing = ExtractSAP.objects.all().exclude(status__in=[
-                        'OPEN',
-                        'BACKLOG',
-                        'CLOSED',
-                        'CHECKED',
-                        'INVALID',
-                        'TO_RE-CHECK',
-                    ]).order_by('id')[:1]
+                    'OPEN',
+                    'BACKLOG',
+                    'CLOSED',
+                    'CHECKED',
+                    'INVALID',
+                    'TO_RE-CHECK',
+                ]).order_by('id')[:1]
                 if next_drawing.count() != 0:
                     # ==> il reste des plans à produire
                     next_ref = next_drawing[0].num_cadastre[:7]
                     # record_to_dispatched = ExtractSAP.objects.filter(num_cadastre__startswith=next_ref).order_by('id')
-                    record_to_dispatched = ExtractSAP.objects.filter(num_cadastre__startswith=next_ref).exclude(status__in=[
+                    record_to_dispatched = ExtractSAP.objects.filter(num_cadastre__startswith=next_ref).exclude(
+                        status__in=[
                             'OPEN',
                             'BACKLOG',
                             'CLOSED',
@@ -571,19 +587,22 @@ class ListeSAP(LoginRequiredMixin, SingleTableView):
                     for record in record_to_dispatched:
                         Work_data.objects.create(id_SAP=record, id_user=self.request.user, status='OPEN')
                         sap = ExtractSAP.objects.get(id=record.pk)
-                        sap.status ='OPEN'
+                        sap.status = 'OPEN'
                         sap.save()
                     return record_to_dispatched
                 else:
                     # il n'y a plus de plans à produire, on passe à la phase POSTRAIT
                     user_drawing_list = [record.id_SAP.pk for record in
-                                         Work_data.objects.filter(id_rechecker__pk=self.request.user.id, status='TO_RE-CHECK')]
+                                         Work_data.objects.filter(id_rechecker__pk=self.request.user.id,
+                                                                  status='TO_RE-CHECK')]
                     record_to_dispatched = ExtractSAP.objects.filter(id__in=user_drawing_list)
                     if record_to_dispatched.count() == 0:
-                        next_drawing = Work_data.objects.filter(id_rechecker=None, status='TO_RE-CHECK').order_by('id')[:1]
+                        next_drawing = Work_data.objects.filter(id_rechecker=None, status='TO_RE-CHECK').order_by('id')[
+                                       :1]
                         if next_drawing:
                             next_ref = next_drawing[0].id_SAP.num_cadastre[:7]
-                            record_to_dispatched = ExtractSAP.objects.filter(num_cadastre__startswith=next_ref, status='TO_RE-CHECK')
+                            record_to_dispatched = ExtractSAP.objects.filter(num_cadastre__startswith=next_ref,
+                                                                             status='TO_RE-CHECK')
                             for record in record_to_dispatched:
                                 oWork_data = Work_data.objects.get(id_SAP=record.pk)
                                 oWork_data.id_rechecker = User.objects.get(pk=self.request.user.id)
@@ -602,12 +621,12 @@ class FilterModDatabase(LoginRequiredMixin, View):
     table_class = ExtractTableExpanded
 
     def get(self, request, *args, **kwargs):
-        db_filter = ExtractSAPFilter(request.GET,queryset=Work_data.objects.filter(status__in=[
-                'CLOSED',
-                'CHECKED',
-                'INVALID',
-            ]))
-        if 'typ' in request.GET: # and request.GET['typ']:
+        db_filter = ExtractSAPFilter(request.GET, queryset=Work_data.objects.filter(status__in=[
+            'CLOSED',
+            'CHECKED',
+            'INVALID',
+        ]))
+        if 'typ' in request.GET:  # and request.GET['typ']:
             table = ExtractTableExpanded(db_filter.qs)
             return render(request, self.template_name, {'filter': db_filter, 'table': table})
         else:
@@ -638,13 +657,14 @@ class FilterModDatabase(LoginRequiredMixin, View):
             SAP_record = ExtractSAP.objects.get(id=record.id_SAP.pk)
             SAP_record.status = new_status
             SAP_record.save()
-            SAP_log.info('Workdata id ' + str(record.pk) + '(' + str(SAP_record.pk) + ')' + ' status changed to re-check')
+            SAP_log.info(
+                'Workdata id ' + str(record.pk) + '(' + str(SAP_record.pk) + ')' + ' status changed to re-check')
 
         SAP_log.removeHandler(SAPHandler)
         SAPHandler.close()
         table = ExtractTableExpanded(db_filter.qs)
 
-        return render(request, self.template_name, {'filter': db_filter,'table': table})
+        return render(request, self.template_name, {'filter': db_filter, 'table': table})
 
 
 class CsvModDatabase(LoginRequiredMixin, View):
@@ -659,7 +679,6 @@ class CsvModDatabase(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         form = self.form_class(request.POST, request.FILES)
         if form.is_valid():
-            import csv
             csv_file = request.FILES["file"]
             file_data = csv_file.read().decode("utf-8")
             lines = file_data.split("\r\n")
@@ -686,19 +705,20 @@ class CsvModDatabase(LoginRequiredMixin, View):
                 SAP_record = ExtractSAP.objects.get(id=record.id_SAP.pk)
                 SAP_record.status = new_status
                 SAP_record.save()
-                SAP_log.info('Workdata id ' + str(record.pk) + '(' + str(SAP_record.pk) + ')' + ' status changed to re-check')
+                SAP_log.info(
+                    'Workdata id ' + str(record.pk) + '(' + str(SAP_record.pk) + ')' + ' status changed to re-check')
 
             SAP_log.removeHandler(SAPHandler)
             SAPHandler.close()
 
-            return render(request, self.template_name, {'form': form,'table': table})
+            return render(request, self.template_name, {'form': form, 'table': table})
 
 
 class UpdatedInfoCreate(LoginRequiredMixin, UpdateView):
     model = ExtractSAP
     template_name = "trackdrawing/UpdatedInfo.html"
     form_class = UpdatedInfoForm
-    success_url =reverse_lazy('accueil')
+    success_url = reverse_lazy('accueil')
 
     def form_valid(self, form):
         SAP_log = logging.getLogger('RecheckModifications')
@@ -713,7 +733,7 @@ class UpdatedInfoCreate(LoginRequiredMixin, UpdateView):
         if form.instance.old_num and not 'Ancien plan' in form.instance.remark:
             form.instance.remark = "Ancien plan: " + form.instance.old_num + "\n" + form.instance.remark
         data = form.cleaned_data
-        if has_group(form.instance.user, 'Check') or record.status=='TO_RE-CHECK':
+        if has_group(form.instance.user, 'Check') or record.status == 'TO_RE-CHECK':
             # drawing is checked
             status = 'CHECKED'
             drawing = ExtractSAP.objects.get(pk=form.instance.pk)
@@ -721,7 +741,7 @@ class UpdatedInfoCreate(LoginRequiredMixin, UpdateView):
                 if data[key] != getattr(drawing, key):
                     # One field has been modified by checker
                     status = 'INVALID'
-                    if record.status=='TO_RE-CHECK':
+                    if record.status == 'TO_RE-CHECK':
                         # log toute les modifs faites lors du re-check
                         if key == 'typ':
                             # Modification du type
@@ -730,7 +750,9 @@ class UpdatedInfoCreate(LoginRequiredMixin, UpdateView):
                                     drawing, key).desc + ' to ' + Type.objects.get(id=data[key].pk).desc)
                         else:
                             try:
-                                SAP_log.info('ExtractSAP id ' + str(drawing.pk) + ' : champ ' + key + ' changed from ' + getattr(drawing, key) +' to '+ data[key])
+                                SAP_log.info(
+                                    'ExtractSAP id ' + str(drawing.pk) + ' : champ ' + key + ' changed from ' + getattr(
+                                        drawing, key) + ' to ' + data[key])
                             except:
                                 SAP_log.info('ExtractSAP id ' + str(drawing.pk) + ' key error ' + key)
                                 # break
@@ -753,7 +775,8 @@ class UpdatedInfoCreate(LoginRequiredMixin, UpdateView):
             SAP_log.addHandler(SAPHandler)
 
             liasse_ref = Work_data.objects.get(id_SAP__pk=form.instance.pk).id_SAP.num_cadastre[:7]
-            record_to_dispatched = Work_data.objects.filter(id_SAP__num_cadastre__startswith=liasse_ref, status='TO_RE-CHECK').exclude(id_SAP__pk=form.instance.pk)
+            record_to_dispatched = Work_data.objects.filter(id_SAP__num_cadastre__startswith=liasse_ref,
+                                                            status='TO_RE-CHECK').exclude(id_SAP__pk=form.instance.pk)
             for rec in record_to_dispatched:
                 # oWork_data = Work_data.objects.get(id_SAP=rec.pk)
                 rec.status = 'CLOSED'
@@ -781,7 +804,7 @@ class UpdatedInfoCreate(LoginRequiredMixin, UpdateView):
 class FilterDatabase(LoginRequiredMixin, View):
     form_class = ShowDistinct
     template_name = 'trackdrawing/db_view.html'
-    status = ['CLOSED',  'CHECKED', 'INVALID']
+    status = ['CLOSED', 'CHECKED', 'INVALID']
 
     def get(self, request, *args, **kwargs):
         form1 = self.form_class()
@@ -793,14 +816,22 @@ class FilterDatabase(LoginRequiredMixin, View):
         # if form1.is_valid():
         if "submit" in request.POST:
             if request.POST['contains']:
-                search_field = request.POST['field_choice'] +'__contains'
+                search_field = request.POST['field_choice'] + '__contains'
                 records = ExtractSAP.objects.filter(**{'status__in': self.status,
-                                                       search_field: request.POST['contains']}).values(request.POST['field_choice']).annotate(count=Count(request.POST['field_choice'])).order_by(request.POST['field_choice'])
-                First_ID = {record[request.POST['field_choice']]: ExtractSAP.objects.filter(**{request.POST['field_choice']:record[request.POST['field_choice']]}).values('id')[0]['id'] for record in records}
+                                                       search_field: request.POST['contains']}).values(
+                    request.POST['field_choice']).annotate(count=Count(request.POST['field_choice'])).order_by(
+                    request.POST['field_choice'])
+                First_ID = {record[request.POST['field_choice']]: ExtractSAP.objects.filter(
+                    **{request.POST['field_choice']: record[request.POST['field_choice']]}).values('id')[0]['id'] for
+                            record in records}
             else:
-                records = ExtractSAP.objects.filter(status__in=self.status).values(request.POST['field_choice']).annotate(count=Count(request.POST['field_choice'])).order_by(request.POST['field_choice'])
-                First_ID = {record[request.POST['field_choice']]: ExtractSAP.objects.filter(**{request.POST['field_choice']:record[request.POST['field_choice']]}).values('id')[0]['id'] for record in records}
-            if request.POST['field_choice']=='title':
+                records = ExtractSAP.objects.filter(status__in=self.status).values(
+                    request.POST['field_choice']).annotate(count=Count(request.POST['field_choice'])).order_by(
+                    request.POST['field_choice'])
+                First_ID = {record[request.POST['field_choice']]: ExtractSAP.objects.filter(
+                    **{request.POST['field_choice']: record[request.POST['field_choice']]}).values('id')[0]['id'] for
+                            record in records}
+            if request.POST['field_choice'] == 'title':
                 search_field = request.POST['field_choice'] + '__contains'
                 records = ExtractSAP.objects.filter(**{'status__in': self.status,
                                                        search_field: request.POST['contains']})
@@ -840,7 +871,8 @@ class FilterDatabase(LoginRequiredMixin, View):
                     SAP_id = str(record.pk)
                     old_value = getattr(record, champ)
                     if new_value:
-                        SAP_log.info('SAP_id: ' + SAP_id + ' champ ' + champ + ' ' + old_value + ' changed to ' + new_value)
+                        SAP_log.info(
+                            'SAP_id: ' + SAP_id + ' champ ' + champ + ' ' + old_value + ' changed to ' + new_value)
                         # record.author = new_value
                         setattr(record, champ, new_value)
                         record.save()
@@ -870,6 +902,7 @@ def UploadDrawing(request, num_cadastre):
         'form': form
     })
 
+
 def DownloadDrawing(request, num_cadastre):
     from .PDFutils import pdf_add_metadata
     fs = FileSystemStorage()
@@ -878,7 +911,8 @@ def DownloadDrawing(request, num_cadastre):
     if fs.exists(os.path.join(os.path.join(fs.location, 'TMP'), filename)):
         return HttpResponseNotFound('The File is already in use')
     else:
-        pdf_add_metadata(fs.location, filename, 'NumeroCadastre', record.num_cadastre, filename, os.path.join(fs.location, 'TMP'))
+        pdf_add_metadata(fs.location, filename, 'NumeroCadastre', record.num_cadastre, filename,
+                         os.path.join(fs.location, 'TMP'))
         file_to_open = os.path.join(os.path.join(fs.location, 'TMP'), filename)
         if fs.exists(filename):
             with fs.open(file_to_open) as pdf:
@@ -905,22 +939,22 @@ def DisplayDrawing(request, num_cadastre):
     # print('Nb image without record', nb_image_without_record)
     # filename = 'E53233081_A00_001.PDF'
     filename = ExtractSAP.objects.get(pk=num_cadastre).num_cadastre
-    if fs.exists(filename +'.tif'):
-        file_in = filename +'.tif'
+    if fs.exists(filename + '.tif'):
+        file_in = filename + '.tif'
         file_in_extend = '.tif'
     elif fs.exists(filename + '.tiff'):
         file_in = filename + '.tiff'
         file_in_extend = '.tiff'
-    elif fs.exists(filename+'.pdf'):
+    elif fs.exists(filename + '.pdf'):
         file_in = filename + '.pdf'
         file_in_extend = '.pdf'
-        file_to_open = os.path.join(fs.location, filename+'.pdf')
+        file_to_open = os.path.join(fs.location, filename + '.pdf')
     filenamein = file_in
     if fs.exists(filenamein):
         if file_in_extend != ".pdf":
             file_out = filename + '.pdf'
             file_to_open = os.path.join(fs.location, file_out)
-            filenameout_tmp = os.path.join(fs.location,filename + '.tiff')
+            filenameout_tmp = os.path.join(fs.location, filename + '.tiff')
             # with open(filenameout, "wb") as f:
             #     f.write(img2pdf.convert(fs.path(filenamein)))
             # Image convert with PILLOW direct ==> produce large PDF
@@ -969,7 +1003,8 @@ def xed_post(request):
         # print(request.POST['model'], request.POST['pk'], request.POST['name'], request.POST['value'])
         fk_model = get_fk_model(_model, request.POST['name'])
         if fk_model:
-            setattr(_obj, request.POST['name'], fk_model.objects.get(id=request.POST['value'])) # Actually change the attribute to the new value
+            setattr(_obj, request.POST['name'],
+                    fk_model.objects.get(id=request.POST['value']))  # Actually change the attribute to the new value
         else:
             setattr(_obj, request.POST['name'], request.POST['value'])  # Actually change the attribute to the new value
         #
@@ -984,7 +1019,8 @@ def xed_post(request):
         #
         # SAP_log.addHandler(SAPHandler)
 
-        log_info('SAP_id: ' + request.POST['pk'] + ' champ ' + request.POST['name'] + ' ' + old_value + ' changed to ' + request.POST['value'], 'ExtractSAP')
+        log_info('SAP_id: ' + request.POST['pk'] + ' champ ' + request.POST['name'] + ' ' + old_value + ' changed to ' +
+                 request.POST['value'], 'ExtractSAP')
 
         _obj.save()  # And save to DB
         # SAP_log.removeHandler(SAPHandler)
@@ -995,7 +1031,7 @@ def xed_post(request):
     # Catch issues like object does not exist (wrong pk) or other
     except Exception as e:
         _data = {'success': False,
-                'error_msg': f'Exception: {e}'}
+                 'error_msg': f'Exception: {e}'}
         return JsonResponse(_data)
 
 
