@@ -75,7 +75,8 @@ def Test(request):
     # create_new_drawing_id()
     # Modify_drawing_from_csv()
     # Modify_division_from_csv()
-    Modify_Num_Cadastre_from_csv()
+    # Modify_Num_Cadastre_from_csv()
+    Maj20200604()
 
     return redirect('Admin')
 
@@ -123,7 +124,7 @@ def Export_Database(request):
         'ID',
         'Site',
         'Div.',
-        'Nouveau numéro Ordre',
+        'Ancien numéro Ordre',
         'Ordre',
         'typ',
         'Intitulé du type de document',

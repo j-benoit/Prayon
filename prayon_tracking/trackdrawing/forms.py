@@ -220,7 +220,7 @@ class UpdatedInfoForm(forms.ModelForm):
                             Field(
                                 "div",
                                 template="trackdrawing/custom_inputs.html",
-                                readonly=True,
+                                # readonly=True,
                             ),
                             css_class="form-group col-md-3 mb-0",
                         ),

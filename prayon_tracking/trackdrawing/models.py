@@ -27,7 +27,7 @@ class communData(models.Model):
 class ExtractSAP(models.Model):
     site = models.CharField(max_length=2, verbose_name='Site', blank=True)
     div = models.CharField(max_length=3, verbose_name='Div.', blank=True)
-    ordre_nv = models.CharField(max_length=15, verbose_name='Nouveau numéro Ordre', blank=True, null=True, default='')
+    ordre_nv = models.CharField(max_length=15, verbose_name='Ancien numéro Ordre', blank=True, null=True, default='')
     ordre = models.IntegerField(verbose_name='Ordre', blank=True, null=True)
     typ = models.ForeignKey(Type, null=True, on_delete=models.PROTECT, blank=True)
     int_typ = models.CharField(max_length=100, verbose_name='Intitulé du type de document', blank=True)

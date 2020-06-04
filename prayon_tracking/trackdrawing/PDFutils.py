@@ -258,7 +258,7 @@ if __name__ == '__main__':
     out_path = "D:\\PRAYON\\PDF"
     filename = 'SP 049.pdf'
     filestamp = 'FXSpydrnejxjdbtdwe.pdf'
-    convert_dir_to_pdf(in_path,out_path)
+    # convert_dir_to_pdf(in_path,out_path)
     # tiff2pdf(in_path, filename, out_path)
     # pdf_add_metadata(in_path, filename, 'NumeroCadastre', '00000-110-444')
     # pdf_add_Annot(in_path, filename, 'EN_046_96008265_BLY_000009_000_ASB_000')
@@ -269,3 +269,18 @@ if __name__ == '__main__':
     #         multitiff2pdf(in_path, file, out_path)
     #     elif ext.casefold() in ['.pdf']:
     #         Split_pdf(in_path, file, out_path)
+
+    div_dict = {26: 96008261,
+                38: 96008253,
+                44: 96008260,
+                46: 96008265,
+                50: 96008242,
+                51: 96008250,
+                52: 96008249,
+                55: 96008243,
+                56: 96008262,
+                57: 96008243,
+                59: 96008245,
+                62: 96008257,
+                89: 96008246,}
+    print(div_dict[26])
