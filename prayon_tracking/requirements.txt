@@ -10,7 +10,7 @@ et-xmlfile==1.0.1
 img2pdf==0.3.3
 jdcal==1.4.1
 MarkupPy==1.14
-numpy==1.18.1
+numpy==1.22.0
 odfpy==1.4.1
 openpyxl==3.0.3
 pandas==1.0.1
